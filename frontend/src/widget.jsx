@@ -52,5 +52,5 @@ if (typeof window !== 'undefined') {
   });
 }
 
-import { ChatbotWidget } from "ai-chatbot-widget"
+export default ChatbotWidget;
 
