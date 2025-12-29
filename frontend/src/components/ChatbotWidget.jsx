@@ -3,7 +3,7 @@ import './ChatbotWidget.css';
 import MessageList from './MessageList';
 import InputArea from './InputArea';
 import LanguageChip from './LanguageChip';
-import { chatAPI } from "../services/api";
+import { chatAPI } from "../services/api.js";
 
 const ChatbotWidget = ({ theme = {}, isPremium = false }) => {
   const [isOpen, setIsOpen] = useState(false);
