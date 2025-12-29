@@ -92,7 +92,7 @@ const getMockResponse = (message, conversationId) => {
 /**
  * Mock chat API call
  */
-export const mockChatAPI = async (message, conversationId = null, languageOverride = null, languageOnly = false) => {
+export const chatAPI = async (message, conversationId = null, languageOverride = null, languageOnly = false) => {
   // Handle language-only requests
   if (languageOnly && languageOverride) {
     await delay(300);
