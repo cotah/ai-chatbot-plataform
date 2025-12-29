@@ -27,7 +27,7 @@ export function initRedis() {
       },
       maxRetriesPerRequest: 3,
       enableReadyCheck: true,
-      enableOfflineQueue: false,
+      enableOfflineQueue: true,
     });
 
     redisClient.on('connect', () => {
