@@ -4,9 +4,10 @@
   "description": "Premium AI chatbot widget for websites",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+  "dev": "vite",
+  "build": "vite build",
+  "build:widget": "vite build -c vite.widget.config.js",
+  "preview": "vite preview"
   },
   "dependencies": {
     "react": "^18.2.0",
