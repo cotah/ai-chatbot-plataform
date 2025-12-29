@@ -1,5 +1,5 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
-const CLIENT_KEY = import.meta.env.VITE_CLIENT_KEY || ""; // <-- define aqui (opcional)
+const CLIENT_KEY = import.meta.env.VITE_CLIENT_KEY || "";
 
 function getSessionId() {
   const key = "chat_session_id";
@@ -24,45 +24,31 @@ async function request(path, options = {}) {
     },
   });
 
-  // tenta ler o body mesmo em erro pra você ver exatamente o motivo
   const text = await res.text().catch(() => "");
 
   if (!res.ok) {
     throw new Error(`API ${res.status} ${res.statusText} - ${text}`);
   }
 
-  // se não tem body, evita crash
-  if (!text) return null;
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    return text;
-  }
+  return text ? JSON.parse(text) : {};
 }
 
-/**
- * Chat API
- * - languageOnly=false -> POST /api/chat
- * - languageOnly=true  -> POST /api/chat/language
- */
 export async function chatAPI({
-  message = "",
-  conversationId = null,
+  message,
+  conversationId,
   languageOverride = null,
   languageOnly = false,
-} = {}) {
-  // troca de idioma (melhor usar o endpoint dedicado)
-  if (languageOnly) {
-    return request("/api/chat/language", {
-      method: "POST",
-      body: JSON.stringify({ languageOverride }),
-    });
-  }
+}) {
+  // ✅ só inclui conversationId se for string válida
+  const body = {
+    message,
+    ...(conversationId ? { conversationId } : {}),
+    ...(languageOverride ? { languageOverride } : {}),
+  };
 
-  // chat normal
   return request("/api/chat", {
     method: "POST",
-    body: JSON.stringify({ message, conversationId, languageOverride }),
+    body: JSON.stringify(body),
   });
 }
+
