@@ -22,6 +22,7 @@ import videoRoutes from './routes/video.routes.js';
 import healthRoutes from './routes/health.routes.js';
 
 const app = express();
+app.set("trust proxy", 1);
 
 // Security middleware
 app.use(helmet({
