@@ -24,6 +24,9 @@ import healthRoutes from './routes/health.routes.js';
 const app = express();
 app.set("trust proxy", 1);
 
+app.get("/", (req, res) => res.status(200).send("OK"));
+app.head("/", (req, res) => res.sendStatus(200));
+
 // Security middleware
 app.use(helmet({
   contentSecurityPolicy: false, // Adjust based on frontend requirements
