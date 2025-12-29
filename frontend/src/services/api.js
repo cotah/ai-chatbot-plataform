@@ -24,31 +24,30 @@ async function request(path, options = {}) {
     },
   });
 
-  const text = await res.text().catch(() => "");
-
   if (!res.ok) {
+    const text = await res.text().catch(() => "");
     throw new Error(`API ${res.status} ${res.statusText} - ${text}`);
   }
 
-  return text ? JSON.parse(text) : {};
+  return res.json();
 }
 
 export async function chatAPI({
   message,
   conversationId,
-  languageOverride = null,
-  languageOnly = false,
+  languageOverride,
+  languageOnly = false, // (fica aqui só pra compatibilidade com o widget)
 }) {
-  // ✅ só inclui conversationId se for string válida
-  const body = {
-    message,
-    ...(conversationId ? { conversationId } : {}),
-    ...(languageOverride ? { languageOverride } : {}),
-  };
+  const body = { message };
+
+  // NÃO envie null
+  if (conversationId) body.conversationId = conversationId;
+  if (languageOverride) body.languageOverride = languageOverride;
 
   return request("/api/chat", {
     method: "POST",
     body: JSON.stringify(body),
   });
 }
+
 
