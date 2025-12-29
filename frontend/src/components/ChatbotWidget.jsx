@@ -3,7 +3,7 @@ import './ChatbotWidget.css';
 import MessageList from './MessageList';
 import InputArea from './InputArea';
 import LanguageChip from './LanguageChip';
-import { chatAPI } from "./services/api";
+import { chatAPI } from "../services/api";
 
 const ChatbotWidget = ({ theme = {}, isPremium = false }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -53,7 +53,12 @@ const ChatbotWidget = ({ theme = {}, isPremium = false }) => {
 
     try {
       // Mock API call with language override if provided
-      const response = await chatAPI({ message, conversationId, languageOverride, languageOnly });
+      const response = await chatAPI({
+  message,
+  conversationId,
+  languageOverride,
+  languageOnly: false
+});
       
       setConversationId(response.conversationId);
 
@@ -105,7 +110,12 @@ const ChatbotWidget = ({ theme = {}, isPremium = false }) => {
 
     try {
       // Call language change endpoint with empty message and languageOverride
-      const response = await chatAPI('', conversationId, newLanguage, true); // true = languageOnly
+      const response = await chatAPI({
+  message: "",
+  conversationId,
+  languageOverride: newLanguage,
+  languageOnly: true
+});
       
       if (response.language) {
         setCurrentLanguage(response.language);
