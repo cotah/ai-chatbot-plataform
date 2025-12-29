@@ -31,12 +31,24 @@ export const handleValidationErrors = (req, res, next) => {
 export const validateChatMessage = [
   body('message')
     .trim()
-    .notEmpty()
-    .withMessage('Message is required')
-    .isLength({ min: 1, max: 2000 })
-    .withMessage('Message must be between 1 and 2000 characters')
-    .escape(),
-  body('conversationId').optional().isUUID().withMessage('Invalid conversation ID'),
+    .isLength({ min: 0, max: 2000 })
+    .withMessage('Message must be at most 2000 characters'),
+  body('conversationId')
+    .optional({ nullable: true, checkFalsy: true })
+    .custom((value) => {
+      // Allow null, undefined, or empty string
+      if (!value) return true;
+      // Validate format if provided
+      if (!/^conv_[0-9]+_[a-z0-9]+$/.test(value)) {
+        throw new Error('Invalid conversation ID format');
+      }
+      return true;
+    }),
+  body('languageOverride')
+    .optional()
+    .isString()
+    .isLength({ min: 2, max: 10 })
+    .withMessage('Invalid language code'),
   handleValidationErrors,
 ];
 

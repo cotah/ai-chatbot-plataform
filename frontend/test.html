@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chatbot Test</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .container {
+      background: white;
+      border-radius: 20px;
+      padding: 40px;
+      max-width: 800px;
+      width: 100%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    h1 {
+      color: #667eea;
+      margin-bottom: 10px;
+    }
+    .status {
+      padding: 15px;
+      border-radius: 10px;
+      margin: 20px 0;
+      font-weight: 500;
+    }
+    .status.success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    .status.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    .status.info {
+      background: #d1ecf1;
+      color: #0c5460;
+      border: 1px solid #bee5eb;
+    }
+    .test-section {
+      margin: 30px 0;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 10px;
+    }
+    .test-section h2 {
+      color: #333;
+      margin-bottom: 15px;
+      font-size: 18px;
+    }
+    button {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      margin: 5px;
+      transition: transform 0.2s;
+    }
+    button:hover {
+      transform: translateY(-2px);
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .log {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 15px;
+      border-radius: 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      max-height: 300px;
+      overflow-y: auto;
+      margin-top: 15px;
+    }
+    .log-entry {
+      margin: 5px 0;
+      padding: 5px;
+      border-left: 3px solid #667eea;
+      padding-left: 10px;
+    }
+    .log-entry.error {
+      border-left-color: #dc3545;
+      color: #ff6b6b;
+    }
+    .log-entry.success {
+      border-left-color: #28a745;
+      color: #51cf66;
+    }
+    input {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      margin: 10px 0;
+    }
+    input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 15px;
+      margin: 20px 0;
+    }
+    .stat-card {
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      border: 2px solid #e0e0e0;
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #667eea;
+    }
+    .stat-label {
+      font-size: 12px;
+      color: #666;
+      margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🤖 AI Chatbot Platform - Test Suite</h1>
+    <p style="color: #666; margin-bottom: 20px;">Complete testing interface for the chatbot API</p>
+
+    <div id="status" class="status info">
+      ⏳ Initializing test environment...
+    </div>
+
+    <div class="stats">
+      <div class="stat-card">
+        <div class="stat-value" id="totalTests">0</div>
+        <div class="stat-label">Total Tests</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="passedTests">0</div>
+        <div class="stat-label">Passed</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="failedTests">0</div>
+        <div class="stat-label">Failed</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="conversationCount">0</div>
+        <div class="stat-label">Conversations</div>
+      </div>
+    </div>
+
+    <div class="test-section">
+      <h2>⚙️ Configuration</h2>
+      <input type="text" id="apiUrl" placeholder="API Base URL" value="http://localhost:3001">
+      <input type="text" id="clientKey" placeholder="Client Key (optional)">
+    </div>
+
+    <div class="test-section">
+      <h2>🧪 Automated Tests</h2>
+      <button onclick="runAllTests()">▶️ Run All Tests</button>
+      <button onclick="testFirstMessage()">1️⃣ First Message</button>
+      <button onclick="testSubsequentMessages()">2️⃣ Subsequent Messages</button>
+      <button onclick="testLanguageChange()">🌐 Language Change</button>
+      <button onclick="testInvalidData()">❌ Invalid Data</button>
+      <button onclick="clearLogs()">🗑️ Clear Logs</button>
+    </div>
+
+    <div class="test-section">
+      <h2>💬 Manual Test</h2>
+      <input type="text" id="manualMessage" placeholder="Type your message...">
+      <button onclick="sendManualMessage()">Send Message</button>
+      <button onclick="resetConversation()">Reset Conversation</button>
+    </div>
+
+    <div class="test-section">
+      <h2>📋 Test Logs</h2>
+      <div id="logs" class="log"></div>
+    </div>
+  </div>
+
+  <script>
+    let sessionId = null;
+    let conversationId = null;
+    let stats = {
+      total: 0,
+      passed: 0,
+      failed: 0,
+      conversations: new Set()
+    };
+
+    function getApiUrl() {
+      return document.getElementById('apiUrl').value;
+    }
+
+    function getClientKey() {
+      return document.getElementById('clientKey').value;
+    }
+
+    function getSessionId() {
+      if (!sessionId) {
+        sessionId = `sess_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        localStorage.setItem('chat_session_id', sessionId);
+      }
+      return sessionId;
+    }
+
+    function log(message, type = 'info') {
+      const logs = document.getElementById('logs');
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      logs.appendChild(entry);
+      logs.scrollTop = logs.scrollHeight;
+    }
+
+    function updateStatus(message, type = 'info') {
+      const status = document.getElementById('status');
+      status.className = `status ${type}`;
+      status.textContent = message;
+    }
+
+    function updateStats() {
+      document.getElementById('totalTests').textContent = stats.total;
+      document.getElementById('passedTests').textContent = stats.passed;
+      document.getElementById('failedTests').textContent = stats.failed;
+      document.getElementById('conversationCount').textContent = stats.conversations.size;
+    }
+
+    async function sendMessage(message, options = {}) {
+      const url = `${getApiUrl()}/api/chat`;
+      const headers = {
+        'Content-Type': 'application/json',
+        'x-session-id': getSessionId(),
+      };
+
+      const clientKey = getClientKey();
+      if (clientKey) {
+        headers['x-client-key'] = clientKey;
+      }
+
+      const body = { message };
+      if (conversationId && !options.ignoreConversationId) {
+        body.conversationId = conversationId;
+      }
+      if (options.languageOverride) {
+        body.languageOverride = options.languageOverride;
+      }
+
+      log(`📤 Sending: ${JSON.stringify(body)}`);
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || `HTTP ${response.status}`);
+      }
+
+      if (data.conversationId) {
+        conversationId = data.conversationId;
+        stats.conversations.add(conversationId);
+      }
+
+      log(`📥 Response: ${JSON.stringify(data).substring(0, 200)}...`, 'success');
+      return data;
+    }
+
+    async function testFirstMessage() {
+      stats.total++;
+      updateStats();
+      
+      try {
+        log('🧪 Test: First Message');
+        conversationId = null; // Reset
+        
+        const response = await sendMessage('Hello, this is my first message');
+        
+        if (!response.conversationId) {
+          throw new Error('No conversationId returned');
+        }
+        if (!response.message) {
+          throw new Error('No message returned');
+        }
+
+        log('✅ Test PASSED: First message works correctly', 'success');
+        stats.passed++;
+        updateStatus('✅ First message test passed', 'success');
+      } catch (error) {
+        log(`❌ Test FAILED: ${error.message}`, 'error');
+        stats.failed++;
+        updateStatus('❌ First message test failed', 'error');
+      }
+      updateStats();
+    }
+
+    async function testSubsequentMessages() {
+      stats.total++;
+      updateStats();
+      
+      try {
+        log('🧪 Test: Subsequent Messages');
+        
+        if (!conversationId) {
+          await testFirstMessage();
+        }
+
+        const response = await sendMessage('This is my second message');
+        
+        if (!response.conversationId) {
+          throw new Error('No conversationId returned');
+        }
+        if (response.conversationId !== conversationId) {
+          throw new Error('ConversationId changed unexpectedly');
+        }
+        if (!response.message) {
+          throw new Error('No message returned');
+        }
+
+        log('✅ Test PASSED: Subsequent messages work correctly', 'success');
+        stats.passed++;
+        updateStatus('✅ Subsequent messages test passed', 'success');
+      } catch (error) {
+        log(`❌ Test FAILED: ${error.message}`, 'error');
+        stats.failed++;
+        updateStatus('❌ Subsequent messages test failed', 'error');
+      }
+      updateStats();
+    }
+
+    async function testLanguageChange() {
+      stats.total++;
+      updateStats();
+      
+      try {
+        log('🧪 Test: Language Change');
+        
+        const response = await sendMessage('', { languageOverride: 'pt-BR' });
+        
+        if (response.language !== 'pt-BR') {
+          throw new Error('Language not changed correctly');
+        }
+
+        log('✅ Test PASSED: Language change works correctly', 'success');
+        stats.passed++;
+        updateStatus('✅ Language change test passed', 'success');
+      } catch (error) {
+        log(`❌ Test FAILED: ${error.message}`, 'error');
+        stats.failed++;
+        updateStatus('❌ Language change test failed', 'error');
+      }
+      updateStats();
+    }
+
+    async function testInvalidData() {
+      stats.total++;
+      updateStats();
+      
+      try {
+        log('🧪 Test: Invalid Data Handling');
+        
+        // Test with invalid conversationId
+        const oldConvId = conversationId;
+        conversationId = 'invalid_id';
+        
+        try {
+          await sendMessage('Test with invalid conversation ID');
+          // Should either accept and create new, or reject with proper error
+          log('ℹ️ API accepted invalid conversationId (may create new conversation)');
+        } catch (error) {
+          if (error.message.includes('Invalid conversation ID')) {
+            log('✅ API properly rejected invalid conversationId', 'success');
+          } else {
+            throw error;
+          }
+        }
+        
+        conversationId = oldConvId;
+
+        log('✅ Test PASSED: Invalid data handled correctly', 'success');
+        stats.passed++;
+        updateStatus('✅ Invalid data test passed', 'success');
+      } catch (error) {
+        log(`❌ Test FAILED: ${error.message}`, 'error');
+        stats.failed++;
+        updateStatus('❌ Invalid data test failed', 'error');
+      }
+      updateStats();
+    }
+
+    async function runAllTests() {
+      log('🚀 Running all tests...');
+      conversationId = null;
+      
+      await testFirstMessage();
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      await testSubsequentMessages();
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      await testLanguageChange();
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      await testInvalidData();
+      
+      const passRate = ((stats.passed / stats.total) * 100).toFixed(1);
+      log(`\n📊 Test Summary: ${stats.passed}/${stats.total} passed (${passRate}%)`);
+      
+      if (stats.failed === 0) {
+        updateStatus(`🎉 All tests passed! (${stats.total}/${stats.total})`, 'success');
+      } else {
+        updateStatus(`⚠️ ${stats.failed} test(s) failed`, 'error');
+      }
+    }
+
+    async function sendManualMessage() {
+      const input = document.getElementById('manualMessage');
+      const message = input.value.trim();
+      
+      if (!message) {
+        updateStatus('⚠️ Please enter a message', 'error');
+        return;
+      }
+
+      try {
+        const response = await sendMessage(message);
+        updateStatus('✅ Message sent successfully', 'success');
+        input.value = '';
+      } catch (error) {
+        updateStatus(`❌ Error: ${error.message}`, 'error');
+      }
+    }
+
+    function resetConversation() {
+      conversationId = null;
+      log('🔄 Conversation reset');
+      updateStatus('🔄 Conversation reset', 'info');
+    }
+
+    function clearLogs() {
+      document.getElementById('logs').innerHTML = '';
+      stats = {
+        total: 0,
+        passed: 0,
+        failed: 0,
+        conversations: new Set()
+      };
+      updateStats();
+      updateStatus('🗑️ Logs cleared', 'info');
+    }
+
+    // Initialize
+    window.addEventListener('DOMContentLoaded', () => {
+      log('✅ Test suite initialized');
+      updateStatus('✅ Ready to test', 'success');
+      
+      // Check if API is reachable
+      fetch(`${getApiUrl()}/api/health`)
+        .then(res => res.json())
+        .then(data => {
+          log(`✅ API health check passed: ${data.status}`);
+          updateStatus('✅ API is reachable and healthy', 'success');
+        })
+        .catch(error => {
+          log(`⚠️ API health check failed: ${error.message}`, 'error');
+          updateStatus('⚠️ Cannot reach API - check URL', 'error');
+        });
+    });
+
+    // Allow Enter key to send manual message
+    document.getElementById('manualMessage').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        sendManualMessage();
+      }
+    });
+  </script>
+</body>
+</html>

@@ -11,6 +11,12 @@ import logger from '../utils/logger.js';
  * Send webhook to n8n
  */
 async function sendWebhook(eventType, payload, retries = 0) {
+  // Skip if webhook URL not configured
+  if (!config.n8n.webhookUrl || config.n8n.webhookUrl === '') {
+    logger.debug('N8N webhook not configured, skipping', { eventType });
+    return { success: false, reason: 'not_configured' };
+  }
+
   try {
     const response = await axios.post(
       config.n8n.webhookUrl,

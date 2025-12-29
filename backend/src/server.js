@@ -34,7 +34,7 @@ app.use(cors({
   origin: config.server.corsOrigin === '*' ? true : config.server.corsOrigin.split(','),
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Session-ID', 'X-API-Key'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Session-ID', 'X-API-Key', 'X-Client-Key'],
 }));
 
 // Body parsing middleware

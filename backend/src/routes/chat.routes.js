@@ -8,6 +8,7 @@ import { chatCompletion } from '../services/openai.service.js';
 import { handleToolCall } from '../services/tool-handlers.js';
 import { webhookNewConversation, webhookError } from '../services/webhook.service.js';
 import { appendCRMData, formatCRMData } from '../services/google-sheets.service.js';
+import { createConversation, saveMessage, upsertClient } from '../services/supabase.service.js';
 import { updateSession } from '../middleware/auth.js';
 import { chatRateLimiter } from '../middleware/rateLimiter.js';
 import { validateChatMessage } from '../middleware/validator.js';
@@ -90,8 +91,18 @@ router.post('/', chatRateLimiter, validateChatMessage, async (req, res, next) =>
     const sessionId = req.sessionId;
     const session = req.session;
 
+    // Reject empty message without language override
+    if (!message || !message.trim()) {
+      if (!languageOverride) {
+        return res.status(400).json({
+          error: 'Message is required',
+          message: 'Please provide a message or language override',
+        });
+      }
+    }
+
     // Handle language-only requests (empty message with languageOverride)
-    if (!message.trim() && languageOverride) {
+    if ((!message || !message.trim()) && languageOverride) {
       // Call language change endpoint logic directly
       const requestedLanguage = normalizeLanguageCode(languageOverride);
       
@@ -152,8 +163,39 @@ router.post('/', chatRateLimiter, validateChatMessage, async (req, res, next) =>
     });
 
     // Get or create conversation
-    let conversationId = providedId || session.metadata?.conversationId;
-    if (!conversationId || !conversations.has(conversationId)) {
+    let conversationId = null;
+    
+    // Priority 1: Use provided conversationId if valid format
+    if (providedId) {
+      if (conversations.has(providedId)) {
+        // Conversation exists in memory
+        conversationId = providedId;
+      } else {
+        // Valid format but not in memory - recreate it
+        conversationId = providedId;
+        conversations.set(conversationId, {
+          id: conversationId,
+          sessionId,
+          messages: [],
+          createdAt: new Date(),
+          lastActivity: new Date(),
+        });
+        logger.info('Recreated conversation from provided ID', {
+          conversationId,
+          sessionId,
+        });
+      }
+    }
+    
+    // Priority 2: Check session for conversationId
+    if (!conversationId && session.metadata?.conversationId) {
+      if (conversations.has(session.metadata.conversationId)) {
+        conversationId = session.metadata.conversationId;
+      }
+    }
+    
+    // Priority 3: Create new conversation
+    if (!conversationId) {
       conversationId = `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       conversations.set(conversationId, {
         id: conversationId,
