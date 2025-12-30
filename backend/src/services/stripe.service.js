@@ -86,14 +86,17 @@ export async function createPaymentLink(orderData) {
       throw new Error('Order total must be at least $0.50');
     }
 
-    // Create a price for this order
+    // Create a product first (required for payment links)
+    const product = await stripe.products.create({
+      name: `Order for ${customerName}`,
+      description: items.map(item => `${item.quantity}x ${item.name}`).join(', '),
+    });
+
+    // Create a price for this product
     const price = await stripe.prices.create({
       unit_amount: amountInCents,
       currency: config.stripe.currency,
-      product_data: {
-        name: `Order for ${customerName}`,
-        description: items.map(item => `${item.quantity}x ${item.name}`).join(', '),
-      },
+      product: product.id,
     });
 
     // Create payment link

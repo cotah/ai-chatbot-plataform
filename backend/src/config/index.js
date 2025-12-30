@@ -72,11 +72,11 @@ export const config = {
   },
 
   language: {
-    mode: process.env.LANGUAGE_MODE || 'single', // 'single' | 'auto' | 'allowed'
+    mode: process.env.LANGUAGE_MODE || 'allowed', // 'single' | 'auto' | 'allowed' - Changed to 'allowed' to enable language selector
     defaultLanguage: process.env.DEFAULT_LANGUAGE || 'en', // 'en' | 'pt-BR' | 'es'
     allowedLanguages: process.env.ALLOWED_LANGUAGES
       ? process.env.ALLOWED_LANGUAGES.split(',').map((lang) => lang.trim())
-      : ['en'],
+      : ['en', 'pt-BR', 'es'], // Changed to include all supported languages
   },
 
   redis: {
