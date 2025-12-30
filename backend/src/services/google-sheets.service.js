@@ -85,13 +85,13 @@ export async function appendCRMData(data) {
     } = data;
 
     const row = [
-      timestamp || new Date().toISOString(),
-      name || '',
-      phone || '',
-      email || '',
-      intent || 'support',
-      notes || '',
-      JSON.stringify(metadata),
+      timestamp || new Date().toISOString(), // Timestamp
+      intent || 'support',                   // Type
+      name || '',                            // Name
+      email || '',                           // Email
+      phone || '',                           // Phone
+      notes || '',                           // Notes
+      JSON.stringify(metadata),              // Extra
     ];
 
     const response = await sheets.spreadsheets.values.append({
@@ -132,12 +132,12 @@ export async function initializeSheetHeaders() {
 
     const headers = [
       'Timestamp',
+      'Type',
       'Name',
-      'Phone',
       'Email',
-      'Intent',
+      'Phone',
       'Notes',
-      'Metadata',
+      'Extra',
     ];
 
     await sheets.spreadsheets.values.update({

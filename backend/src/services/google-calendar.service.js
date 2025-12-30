@@ -112,7 +112,7 @@ export async function createReservationEvent(reservationData) {
   } catch (error) {
     logger.error('Failed to create reservation event', {
       error: error.message,
-      reservationData: { name, email, date, time },
+      reservationData: reservationData,
     });
     throw error;
   }
