@@ -49,6 +49,11 @@ const LANGUAGE_KEYWORDS = {
  * This is a simple heuristic - in production, consider using a proper language detection library
  */
 export function detectLanguage(text) {
+  // DISABLED: Always return English to prevent language mixing
+  // User must explicitly change language via language selector
+  return 'en';
+  
+  /* ORIGINAL CODE - DISABLED
   if (!text || typeof text !== 'string') {
     return config.language.defaultLanguage;
   }
@@ -84,6 +89,7 @@ export function detectLanguage(text) {
 
   // Default to English if no clear pattern
   return 'en';
+  */
 }
 
 /**

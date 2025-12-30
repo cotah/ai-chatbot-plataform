@@ -68,6 +68,81 @@ export async function createPaymentIntent(orderData) {
 }
 
 /**
+ * Create a payment link for an order
+ */
+export async function createPaymentLink(orderData) {
+  try {
+    const { items, customerName, customerEmail, customerPhone, notes } = orderData;
+
+    // Calculate total amount
+    const amount = items.reduce((sum, item) => {
+      return sum + item.price * item.quantity;
+    }, 0);
+
+    // Convert to cents (Stripe uses smallest currency unit)
+    const amountInCents = Math.round(amount * 100);
+
+    if (amountInCents < 50) {
+      throw new Error('Order total must be at least $0.50');
+    }
+
+    // Create a price for this order
+    const price = await stripe.prices.create({
+      unit_amount: amountInCents,
+      currency: config.stripe.currency,
+      product_data: {
+        name: `Order for ${customerName}`,
+        description: items.map(item => `${item.quantity}x ${item.name}`).join(', '),
+      },
+    });
+
+    // Create payment link
+    const paymentLink = await stripe.paymentLinks.create({
+      line_items: [
+        {
+          price: price.id,
+          quantity: 1,
+        },
+      ],
+      metadata: {
+        customerName,
+        customerEmail,
+        customerPhone,
+        orderType: 'pickup',
+        itemCount: items.length.toString(),
+        notes: notes || '',
+      },
+      after_completion: {
+        type: 'redirect',
+        redirect: {
+          url: config.stripe.successUrl || 'https://ai-chatbot-plataform.vercel.app?payment=success',
+        },
+      },
+    });
+
+    logger.info('Payment link created', {
+      paymentLinkId: paymentLink.id,
+      amount: amountInCents,
+      customerEmail: customerEmail ? '***' : '',
+    });
+
+    return {
+      paymentLinkId: paymentLink.id,
+      paymentLinkUrl: paymentLink.url,
+      amount: amount,
+      amountInCents,
+      currency: config.stripe.currency,
+    };
+  } catch (error) {
+    logger.error('Failed to create payment link', {
+      error: error.message,
+      customerEmail: orderData.customerEmail ? '***' : '',
+    });
+    throw error;
+  }
+}
+
+/**
  * Confirm payment intent (verify payment was successful)
  */
 export async function confirmPaymentIntent(paymentIntentId) {
@@ -148,6 +223,7 @@ export function verifyWebhookSignature(payload, signature) {
 
 export default {
   createPaymentIntent,
+  createPaymentLink,
   confirmPaymentIntent,
   cancelPaymentIntent,
   verifyWebhookSignature,

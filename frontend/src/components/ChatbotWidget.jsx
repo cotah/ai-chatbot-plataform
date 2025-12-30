@@ -5,7 +5,7 @@ import InputArea from "./InputArea";
 import LanguageChip from "./LanguageChip";
 import { chatAPI } from "../services/api.js";
 
-const ChatbotWidget = ({ theme = {}, isPremium = false }) => {
+const ChatbotWidget = ({ theme = {}, isPremium = true }) => { // Enable language selector by default
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -36,6 +36,13 @@ const ChatbotWidget = ({ theme = {}, isPremium = false }) => {
       ]);
     }
   }, [isOpen]);
+
+  // Force English as default language
+  useEffect(() => {
+    setCurrentLanguage('en');
+    setLanguageMode('allowed');
+    setAllowedLanguages(['en', 'pt-BR', 'es']);
+  }, []);
 
   const handleSendMessage = async (message, languageOverride = null) => {
     if (!message.trim()) return;

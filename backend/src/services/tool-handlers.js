@@ -5,7 +5,7 @@
  */
 
 import { createReservationEvent } from './google-calendar.service.js';
-import { createPaymentIntent } from './stripe.service.js';
+import { createPaymentIntent, createPaymentLink } from './stripe.service.js';
 import { createVideoSession } from './heygen.service.js';
 import { appendCRMData, formatCRMData } from './google-sheets.service.js';
 import { webhookReservationCreated, webhookOrderPaid, webhookVideoStarted, webhookWhatsAppFallback } from './webhook.service.js';
@@ -78,8 +78,8 @@ export async function handleCreateOrder(args, sessionId) {
   try {
     const { items, customerName, customerPhone, customerEmail, notes } = args;
 
-    // Create payment intent
-    const paymentData = await createPaymentIntent({
+    // Create payment link
+    const paymentData = await createPaymentLink({
       items,
       customerName,
       customerEmail,
@@ -87,11 +87,24 @@ export async function handleCreateOrder(args, sessionId) {
       notes,
     });
 
+    // Store in CRM
+    await appendCRMData(
+      formatCRMData('order', {
+        name: customerName,
+        phone: customerPhone,
+        email: customerEmail,
+        notes,
+        items: items.map(item => `${item.quantity}x ${item.name}`).join(', '),
+        amount: paymentData.amount,
+        paymentLinkId: paymentData.paymentLinkId,
+      })
+    );
+
     return {
       success: true,
-      message: `Order created. Please proceed to payment.`,
-      paymentIntentId: paymentData.paymentIntentId,
-      clientSecret: paymentData.clientSecret,
+      message: `Order created for ${customerName}. Total: $${paymentData.amount.toFixed(2)}. Please use this link to complete payment: ${paymentData.paymentLinkUrl}`,
+      paymentLinkId: paymentData.paymentLinkId,
+      paymentLinkUrl: paymentData.paymentLinkUrl,
       amount: paymentData.amount,
       currency: paymentData.currency,
     };
