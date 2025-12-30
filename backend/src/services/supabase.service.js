@@ -1,5 +1,5 @@
 /**
- * Supabase Service
+ * Supabase Service - VERSÃO CORRIGIDA
  * Handles Supabase client and database operations
  */
 
@@ -52,18 +52,61 @@ export function getSupabaseClient() {
 }
 
 /**
- * Get client by email or phone
+ * ========================================
+ * USER PROFILES
+ * ========================================
  */
-export async function getClientByIdentifier(identifier, type = 'email') {
+
+/**
+ * Criar ou atualizar perfil do usuário
+ */
+export async function upsertUserProfile(profileData) {
+  try {
+    const client = getSupabaseClient();
+    if (!client) {
+      logger.debug('Supabase not configured, skipping user profile upsert');
+      return null;
+    }
+
+    const { data, error } = await client
+      .from('user_profiles')
+      .upsert(profileData, {
+        onConflict: 'session_id',
+        ignoreDuplicates: false,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    logger.info('User profile saved to Supabase', {
+      sessionId: profileData.session_id,
+    });
+
+    return data;
+  } catch (error) {
+    logger.error('Failed to upsert user profile in Supabase', {
+      error: error.message,
+      sessionId: profileData.session_id,
+    });
+    return null;
+  }
+}
+
+/**
+ * Buscar perfil do usuário por session_id
+ */
+export async function getUserProfile(sessionId) {
   try {
     const client = getSupabaseClient();
     if (!client) return null;
 
-    const column = type === 'email' ? 'email' : 'phone';
     const { data, error } = await client
-      .from('clients')
+      .from('user_profiles')
       .select('*')
-      .eq(column, identifier)
+      .eq('session_id', sessionId)
       .single();
 
     if (error) {
@@ -76,44 +119,19 @@ export async function getClientByIdentifier(identifier, type = 'email') {
 
     return data;
   } catch (error) {
-    logger.error('Failed to get client from Supabase', {
+    logger.error('Failed to get user profile from Supabase', {
       error: error.message,
-      identifier,
-      type,
+      sessionId,
     });
     return null;
   }
 }
 
 /**
- * Create or update client
+ * ========================================
+ * CONVERSATIONS
+ * ========================================
  */
-export async function upsertClient(clientData) {
-  try {
-    const client = getSupabaseClient();
-    if (!client) return null;
-
-    const { data, error } = await client
-      .from('clients')
-      .upsert(clientData, {
-        onConflict: 'email',
-        ignoreDuplicates: false,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      throw error;
-    }
-
-    return data;
-  } catch (error) {
-    logger.error('Failed to upsert client in Supabase', {
-      error: error.message,
-    });
-    return null;
-  }
-}
 
 /**
  * Create conversation
@@ -121,7 +139,10 @@ export async function upsertClient(clientData) {
 export async function createConversation(conversationData) {
   try {
     const client = getSupabaseClient();
-    if (!client) return null;
+    if (!client) {
+      logger.debug('Supabase not configured, skipping conversation creation');
+      return null;
+    }
 
     const { data, error } = await client
       .from('conversations')
@@ -133,57 +154,68 @@ export async function createConversation(conversationData) {
       throw error;
     }
 
+    logger.info('Conversation created in Supabase', {
+      conversationId: conversationData.id,
+    });
+
     return data;
   } catch (error) {
     logger.error('Failed to create conversation in Supabase', {
       error: error.message,
+      conversationId: conversationData.id,
     });
     return null;
   }
 }
+
+/**
+ * Buscar conversas de um usuário
+ */
+export async function getConversationsBySession(sessionId) {
+  try {
+    const client = getSupabaseClient();
+    if (!client) return [];
+
+    const { data, error } = await client
+      .from('conversations')
+      .select('*')
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      throw error;
+    }
+
+    return data || [];
+  } catch (error) {
+    logger.error('Failed to get conversations from Supabase', {
+      error: error.message,
+      sessionId,
+    });
+    return [];
+  }
+}
+
+/**
+ * ========================================
+ * MESSAGES
+ * ========================================
+ */
 
 /**
  * Save message to Supabase (async, non-blocking)
  */
 export async function saveMessage(messageData) {
-  // Run asynchronously, don't block
-  setImmediate(async () => {
-    try {
-      const client = getSupabaseClient();
-      if (!client) return;
-
-      const { error } = await client
-        .from('messages')
-        .insert(messageData);
-
-      if (error) {
-        throw error;
-      }
-
-      logger.debug('Message saved to Supabase', {
-        conversationId: messageData.conversation_id,
-      });
-    } catch (error) {
-      logger.error('Failed to save message to Supabase', {
-        error: error.message,
-        conversationId: messageData.conversation_id,
-      });
-      // Don't throw - this is non-blocking
-    }
-  });
-}
-
-/**
- * Create reservation
- */
-export async function createReservation(reservationData) {
   try {
     const client = getSupabaseClient();
-    if (!client) return null;
+    if (!client) {
+      logger.debug('Supabase not configured, skipping message save');
+      return null;
+    }
 
     const { data, error } = await client
-      .from('reservations')
-      .insert(reservationData)
+      .from('messages')
+      .insert(messageData)
       .select()
       .single();
 
@@ -191,54 +223,68 @@ export async function createReservation(reservationData) {
       throw error;
     }
 
+    logger.debug('Message saved to Supabase', {
+      conversationId: messageData.conversation_id,
+      role: messageData.role,
+    });
+
     return data;
   } catch (error) {
-    logger.error('Failed to create reservation in Supabase', {
+    logger.error('Failed to save message to Supabase', {
       error: error.message,
+      conversationId: messageData.conversation_id,
     });
     return null;
   }
 }
 
 /**
- * Create order
+ * Buscar mensagens de uma conversa
  */
-export async function createOrder(orderData) {
+export async function getMessagesByConversation(conversationId) {
   try {
     const client = getSupabaseClient();
-    if (!client) return null;
+    if (!client) return [];
 
     const { data, error } = await client
-      .from('orders')
-      .insert(orderData)
-      .select()
-      .single();
+      .from('messages')
+      .select('*')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: true });
 
     if (error) {
       throw error;
     }
 
-    return data;
+    return data || [];
   } catch (error) {
-    logger.error('Failed to create order in Supabase', {
+    logger.error('Failed to get messages from Supabase', {
       error: error.message,
+      conversationId,
     });
-    return null;
+    return [];
   }
 }
 
 /**
- * Get client plan
+ * ========================================
+ * LEGACY FUNCTIONS (manter compatibilidade)
+ * ========================================
  */
-export async function getClientPlan(clientId) {
+
+/**
+ * Get client by email or phone (legacy)
+ */
+export async function getClientByIdentifier(identifier, type = 'email') {
   try {
     const client = getSupabaseClient();
     if (!client) return null;
 
+    const column = type === 'email' ? 'email' : 'phone';
     const { data, error } = await client
-      .from('clients')
-      .select('plan')
-      .eq('id', clientId)
+      .from('user_profiles')
+      .select('*')
+      .eq(column, identifier)
       .single();
 
     if (error) {
@@ -248,25 +294,39 @@ export async function getClientPlan(clientId) {
       throw error;
     }
 
-    return data?.plan || null;
+    return data;
   } catch (error) {
-    logger.error('Failed to get client plan from Supabase', {
+    logger.error('Failed to get client from Supabase', {
       error: error.message,
-      clientId,
     });
     return null;
   }
 }
 
+/**
+ * Create or update client (legacy - usa user_profiles)
+ */
+export async function upsertClient(clientData) {
+  // Redireciona para upsertUserProfile
+  return upsertUserProfile(clientData);
+}
+
+/**
+ * ========================================
+ * EXPORTS
+ * ========================================
+ */
+
 export default {
   initSupabase,
   getSupabaseClient,
+  upsertUserProfile,
+  getUserProfile,
+  createConversation,
+  getConversationsBySession,
+  saveMessage,
+  getMessagesByConversation,
+  // Legacy
   getClientByIdentifier,
   upsertClient,
-  createConversation,
-  saveMessage,
-  createReservation,
-  createOrder,
-  getClientPlan,
 };
-

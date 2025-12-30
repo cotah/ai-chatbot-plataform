@@ -6,7 +6,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../utils/logger.js';
 import { getSession, setSession, refreshSessionTTL } from '../services/redis.service.js';
-import { getClientByIdentifier } from '../services/supabase.service.js';
+import { getClientByIdentifier } from '../services/supabase.service.OLD.js';
 
 // Fallback in-memory store if Redis is unavailable
 const fallbackSessions = new Map();

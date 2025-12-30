@@ -8,7 +8,7 @@ import { chatCompletion } from '../services/openai.service.js';
 import { handleToolCall } from '../services/tool-handlers.js';
 import { webhookNewConversation, webhookError } from '../services/webhook.service.js';
 import { appendCRMData, formatCRMData } from '../services/google-sheets.service.js';
-import { createConversation, saveMessage, upsertClient } from '../services/supabase.service.js';
+import { createConversation, saveMessage, upsertClient } from '../services/supabase.service.OLD.js';
 import { updateSession } from '../middleware/auth.js';
 import { chatRateLimiter } from '../middleware/rateLimiter.js';
 import { validateChatMessage } from '../middleware/validator.js';
