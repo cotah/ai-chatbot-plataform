@@ -11,7 +11,7 @@ import logger from './utils/logger.js';
 import { sessionMiddleware } from './middleware/auth.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { initRedis } from './services/redis.service.js';
-import { initSupabase } from './services/supabase.service.OLD.js';
+import { initSupabase } from './services/supabase.service.js';
 
 // Routes
 import chatRoutes from './routes/chat.routes.js';
