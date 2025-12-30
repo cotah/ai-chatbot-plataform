@@ -68,7 +68,8 @@ const ChatbotWidget = ({ theme = {}, isPremium = true }) => { // Enable language
       if (response.conversationId) setConversationId(response.conversationId);
 
       if (response.language) setCurrentLanguage(response.language);
-      if (response.languageMode) setLanguageMode(response.languageMode);
+      // Keep languageMode as 'allowed' - don't let backend override
+      // if (response.languageMode) setLanguageMode(response.languageMode);
       if (response.allowedLanguages) setAllowedLanguages(response.allowedLanguages);
 
       const assistantMessage = {

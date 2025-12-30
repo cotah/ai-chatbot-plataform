@@ -19,7 +19,10 @@ const InputArea = ({
     if (inputValue.trim() && !isLoading) {
       onSendMessage(inputValue.trim());
       setInputValue('');
-      // Keep focus on input after sending - removed textInputRef.current?.focus();
+      // Keep focus on input after sending
+      setTimeout(() => {
+        textInputRef.current?.focus();
+      }, 0);
     }
   };
 
