@@ -1,6 +1,7 @@
 /**
  * Chat Routes
  * Main chat endpoint with OpenAI integration
+ * VERSÃO CORRIGIDA - Salva dados no Supabase SEMPRE
  */
 
 import express from 'express';
@@ -208,18 +209,6 @@ router.post('/', chatRateLimiter, validateChatMessage, async (req, res, next) =>
       // Update session with conversation ID
       await updateSession(sessionId, { conversationId });
 
-      // Create conversation in Supabase (async, non-blocking)
-      if (session.metadata?.clientId) {
-        createConversation({
-          id: conversationId,
-          client_id: session.metadata.clientId,
-          language: sessionLanguage,
-          created_at: new Date().toISOString(),
-        }).catch((err) => {
-          logger.error('Failed to create conversation in Supabase', { error: err.message });
-        });
-      }
-
       // Trigger new conversation webhook
       await webhookNewConversation(sessionId, { conversationId }).catch((err) => {
         logger.error('Failed to send new conversation webhook', { error: err.message });
@@ -229,6 +218,45 @@ router.post('/', chatRateLimiter, validateChatMessage, async (req, res, next) =>
     const conversation = conversations.get(conversationId);
     conversation.lastActivity = new Date();
 
+    // ============================================
+    // NOVO: Salvar perfil do usuário no Supabase
+    // ============================================
+    if (sessionId) {
+      try {
+        await upsertClient({
+          session_id: sessionId,
+          name: session.metadata?.name || null,
+          email: session.metadata?.email || null,
+          phone: session.metadata?.phone || null,
+          language: sessionLanguage || 'en',
+          last_interaction: new Date().toISOString(),
+        });
+        logger.info('User profile saved to Supabase', { sessionId });
+      } catch (error) {
+        logger.error('Failed to save user profile', { error: error.message, sessionId });
+      }
+    }
+
+    // ============================================
+    // NOVO: Salvar conversa no Supabase
+    // ============================================
+    if (sessionId && conversationId) {
+      try {
+        await createConversation({
+          id: conversationId,
+          session_id: sessionId,
+          language: sessionLanguage || 'en',
+          created_at: new Date().toISOString(),
+        });
+        logger.info('Conversation saved to Supabase', { conversationId, sessionId });
+      } catch (error) {
+        // Ignora erro se conversa já existe
+        if (!error.message.includes('duplicate key')) {
+          logger.error('Failed to save conversation', { error: error.message, conversationId });
+        }
+      }
+    }
+
     // Add user message
     const userMessage = {
       role: 'user',
@@ -237,13 +265,19 @@ router.post('/', chatRateLimiter, validateChatMessage, async (req, res, next) =>
     };
     conversation.messages.push(userMessage);
 
-    // Save user message to Supabase (async, non-blocking)
-    if (session.metadata?.clientId) {
+    // ============================================
+    // CORRIGIDO: Salvar mensagem do usuário (sem depender de clientId)
+    // ============================================
+    if (conversationId) {
       saveMessage({
         conversation_id: conversationId,
         role: 'user',
         content: message,
         created_at: userMessage.timestamp,
+      }).then(() => {
+        logger.info('User message saved to Supabase', { conversationId });
+      }).catch((error) => {
+        logger.error('Failed to save user message', { error: error.message, conversationId });
       });
     }
 
@@ -252,6 +286,22 @@ router.post('/', chatRateLimiter, validateChatMessage, async (req, res, next) =>
 
     // Add assistant message
     conversation.messages.push(completion.message);
+
+    // ============================================
+    // NOVO: Salvar resposta do assistente
+    // ============================================
+    if (conversationId) {
+      saveMessage({
+        conversation_id: conversationId,
+        role: 'assistant',
+        content: completion.message.content,
+        created_at: completion.message.timestamp || new Date().toISOString(),
+      }).then(() => {
+        logger.info('Assistant message saved to Supabase', { conversationId });
+      }).catch((error) => {
+        logger.error('Failed to save assistant message', { error: error.message, conversationId });
+      });
+    }
 
     // Handle tool calls
     let toolResults = [];
@@ -306,13 +356,19 @@ router.post('/', chatRateLimiter, validateChatMessage, async (req, res, next) =>
       conversation.messages.push(assistantMessage);
       finalMessage = assistantMessage.content;
 
-      // Save assistant message to Supabase (async, non-blocking)
-      if (session.metadata?.clientId) {
+      // ============================================
+      // CORRIGIDO: Salvar mensagem final do assistente (sem depender de clientId)
+      // ============================================
+      if (conversationId) {
         saveMessage({
           conversation_id: conversationId,
           role: 'assistant',
           content: finalMessage,
           created_at: new Date().toISOString(),
+        }).then(() => {
+          logger.info('Final assistant message saved to Supabase', { conversationId });
+        }).catch((error) => {
+          logger.error('Failed to save final assistant message', { error: error.message, conversationId });
         });
       }
       
@@ -329,20 +385,6 @@ router.post('/', chatRateLimiter, validateChatMessage, async (req, res, next) =>
       lastConversationId: conversationId,
       messageCount: conversation.messages.length,
     });
-
-    // Update client data if we have email/phone (async, non-blocking)
-    if (message && (session.metadata?.email || session.metadata?.phone)) {
-      const clientData = {
-        email: session.metadata.email,
-        phone: session.metadata.phone,
-        preferred_language: sessionLanguage,
-        updated_at: new Date().toISOString(),
-      };
-      
-      upsertClient(clientData).catch((err) => {
-        logger.error('Failed to upsert client in Supabase', { error: err.message });
-      });
-    }
 
     // Log conversation for CRM (non-intrusive)
     await appendCRMData(
@@ -395,4 +437,3 @@ router.post('/', chatRateLimiter, validateChatMessage, async (req, res, next) =>
 });
 
 export default router;
-
