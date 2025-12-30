@@ -103,3 +103,22 @@
   color: rgba(255, 255, 255, 0.7);
 }
 
+/* Clickable links in messages */
+.message-link {
+  color: inherit;
+  text-decoration: underline;
+  font-weight: 600;
+  transition: opacity 0.2s;
+}
+
+.message-link:hover {
+  opacity: 0.8;
+}
+
+.message-user .message-link {
+  color: white;
+}
+
+.message-assistant .message-link {
+  color: var(--primary-color, #667eea);
+}

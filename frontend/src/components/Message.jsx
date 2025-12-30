@@ -1,6 +1,32 @@
 import React from 'react';
 import './Message.css';
 
+// Function to convert URLs in text to clickable links
+const linkifyText = (text) => {
+  if (!text) return text;
+  
+  // Regex to match URLs
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const parts = text.split(urlRegex);
+  
+  return parts.map((part, index) => {
+    if (part.match(urlRegex)) {
+      return (
+        <a
+          key={index}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="message-link"
+        >
+          {part}
+        </a>
+      );
+    }
+    return part;
+  });
+};
+
 const Message = ({ message }) => {
   const isUser = message.role === 'user';
   const isError = message.role === 'error';
@@ -21,7 +47,7 @@ const Message = ({ message }) => {
       className={`message ${isUser ? 'message-user' : 'message-assistant'} ${isError ? 'message-error' : ''}`}
     >
       <div className="message-content">
-        {message.content}
+        {linkifyText(message.content)}
       </div>
       {message.toolCalls && message.toolCalls.length > 0 && (
         <div className="message-tool-calls">
