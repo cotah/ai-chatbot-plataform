@@ -18,6 +18,13 @@ async function initializeCalendarClient() {
   }
 
   try {
+    // Debug: log available config
+    logger.info('Google Calendar initialization attempt', {
+      hasServiceAccountKeyJson: !!config.google.serviceAccountKeyJson,
+      hasServiceAccountKey: !!config.google.serviceAccountKey,
+      serviceAccountKeyJsonLength: config.google.serviceAccountKeyJson?.length || 0,
+    });
+
     let credentials;
 
     // Try to parse JSON string first
