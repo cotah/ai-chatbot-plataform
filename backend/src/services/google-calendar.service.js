@@ -81,12 +81,13 @@ export async function createReservationEvent(reservationData) {
         dateTime: endDateTime.toISOString(),
         timeZone: 'UTC',
       },
-      attendees: [
-        {
-          email: email,
-          displayName: name,
-        },
-      ],
+      // Attendees removed - service account cannot invite without Domain-Wide Delegation
+      // attendees: [
+      //   {
+      //     email: email,
+      //     displayName: name,
+      //   },
+      // ],
       reminders: {
         useDefault: false,
         overrides: [
@@ -100,7 +101,7 @@ export async function createReservationEvent(reservationData) {
     const response = await calendar.events.insert({
       calendarId: config.google.calendarId,
       requestBody: event,
-      sendUpdates: 'all', // Send email notifications
+      sendUpdates: 'none', // Don't send email notifications (service account limitation)
     });
 
     logger.info('Reservation event created', {
