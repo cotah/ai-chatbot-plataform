@@ -24,10 +24,22 @@ async function initializeSheetsClient() {
     if (config.google.serviceAccountKeyJson) {
       credentials = JSON.parse(config.google.serviceAccountKeyJson);
     } else if (config.google.serviceAccountKey) {
-      // Load from file path
-      const fs = await import('fs');
-      const credentialsData = fs.readFileSync(config.google.serviceAccountKey, 'utf8');
-      credentials = JSON.parse(credentialsData);
+      // Check if it's a JSON string or file path
+      const keyValue = config.google.serviceAccountKey.trim();
+      
+      if (keyValue.startsWith('{')) {
+        // It's a JSON string
+        try {
+          credentials = JSON.parse(keyValue);
+        } catch (parseError) {
+          throw new Error('Invalid JSON in GOOGLE_SERVICE_ACCOUNT_KEY');
+        }
+      } else {
+        // It's a file path
+        const fs = await import('fs');
+        const credentialsData = fs.readFileSync(keyValue, 'utf8');
+        credentials = JSON.parse(credentialsData);
+      }
     } else {
       throw new Error('Google service account credentials not configured');
     }
@@ -53,6 +65,12 @@ async function initializeSheetsClient() {
  * Append CRM data to Google Sheets
  */
 export async function appendCRMData(data) {
+  // Skip if not configured
+  if (!config.google.serviceAccountKey && !config.google.serviceAccountKeyJson) {
+    logger.debug('Google Sheets not configured, skipping CRM data append');
+    return { success: false, reason: 'not_configured' };
+  }
+
   try {
     const sheets = await initializeSheetsClient();
 

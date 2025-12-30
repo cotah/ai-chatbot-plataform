@@ -8,6 +8,7 @@ import { chatCompletion } from '../services/openai.service.js';
 import { handleToolCall } from '../services/tool-handlers.js';
 import { webhookNewConversation, webhookError } from '../services/webhook.service.js';
 import { appendCRMData, formatCRMData } from '../services/google-sheets.service.js';
+import { createConversation, saveMessage, upsertClient, upsertUserProfile } from '../services/supabase.service.js';
 import { updateSession } from '../middleware/auth.js';
 import { chatRateLimiter } from '../middleware/rateLimiter.js';
 import { validateChatMessage } from '../middleware/validator.js';
@@ -90,8 +91,18 @@ router.post('/', chatRateLimiter, validateChatMessage, async (req, res, next) =>
     const sessionId = req.sessionId;
     const session = req.session;
 
+    // Reject empty message without language override
+    if (!message || !message.trim()) {
+      if (!languageOverride) {
+        return res.status(400).json({
+          error: 'Message is required',
+          message: 'Please provide a message or language override',
+        });
+      }
+    }
+
     // Handle language-only requests (empty message with languageOverride)
-    if (!message.trim() && languageOverride) {
+    if ((!message || !message.trim()) && languageOverride) {
       // Call language change endpoint logic directly
       const requestedLanguage = normalizeLanguageCode(languageOverride);
       
@@ -152,8 +163,39 @@ router.post('/', chatRateLimiter, validateChatMessage, async (req, res, next) =>
     });
 
     // Get or create conversation
-    let conversationId = providedId || session.metadata?.conversationId;
-    if (!conversationId || !conversations.has(conversationId)) {
+    let conversationId = null;
+    
+    // Priority 1: Use provided conversationId if valid format
+    if (providedId) {
+      if (conversations.has(providedId)) {
+        // Conversation exists in memory
+        conversationId = providedId;
+      } else {
+        // Valid format but not in memory - recreate it
+        conversationId = providedId;
+        conversations.set(conversationId, {
+          id: conversationId,
+          sessionId,
+          messages: [],
+          createdAt: new Date(),
+          lastActivity: new Date(),
+        });
+        logger.info('Recreated conversation from provided ID', {
+          conversationId,
+          sessionId,
+        });
+      }
+    }
+    
+    // Priority 2: Check session for conversationId
+    if (!conversationId && session.metadata?.conversationId) {
+      if (conversations.has(session.metadata.conversationId)) {
+        conversationId = session.metadata.conversationId;
+      }
+    }
+    
+    // Priority 3: Create new conversation
+    if (!conversationId) {
       conversationId = `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       conversations.set(conversationId, {
         id: conversationId,
@@ -167,16 +209,15 @@ router.post('/', chatRateLimiter, validateChatMessage, async (req, res, next) =>
       await updateSession(sessionId, { conversationId });
 
       // Create conversation in Supabase (async, non-blocking)
-      if (session.metadata?.clientId) {
-        createConversation({
-          id: conversationId,
-          client_id: session.metadata.clientId,
-          language: sessionLanguage,
-          created_at: new Date().toISOString(),
-        }).catch((err) => {
-          logger.error('Failed to create conversation in Supabase', { error: err.message });
-        });
-      }
+      createConversation({
+        id: conversationId,
+        session_id: sessionId,
+        language: sessionLanguage,
+        intent: 'support',
+        created_at: new Date().toISOString(),
+      }).catch((err) => {
+        logger.error('Failed to create conversation in Supabase', { error: err.message });
+      });
 
       // Trigger new conversation webhook
       await webhookNewConversation(sessionId, { conversationId }).catch((err) => {
@@ -196,14 +237,15 @@ router.post('/', chatRateLimiter, validateChatMessage, async (req, res, next) =>
     conversation.messages.push(userMessage);
 
     // Save user message to Supabase (async, non-blocking)
-    if (session.metadata?.clientId) {
-      saveMessage({
-        conversation_id: conversationId,
-        role: 'user',
-        content: message,
-        created_at: userMessage.timestamp,
-      });
-    }
+    saveMessage({
+      conversation_id: conversationId,
+      session_id: sessionId,
+      role: 'user',
+      content: message,
+      created_at: userMessage.timestamp,
+    }).catch((err) => {
+      logger.error('Failed to save user message to Supabase', { error: err.message });
+    });
 
     // Get AI response with session language
     const completion = await chatCompletion(conversation.messages, conversationId, sessionLanguage);
@@ -214,6 +256,7 @@ router.post('/', chatRateLimiter, validateChatMessage, async (req, res, next) =>
     // Handle tool calls
     let toolResults = [];
     let finalMessage = completion.message.content;
+    let userProfileData = {};
     
     if (completion.message.tool_calls && completion.message.tool_calls.length > 0) {
       // Execute tool calls
@@ -227,6 +270,15 @@ router.post('/', chatRateLimiter, validateChatMessage, async (req, res, next) =>
             },
             sessionId
           );
+          
+          // Extract user data from tool calls
+          const args = typeof toolCall.function.arguments === 'string' 
+            ? JSON.parse(toolCall.function.arguments) 
+            : toolCall.function.arguments;
+          
+          if (args.name) userProfileData.name = args.name;
+          if (args.email) userProfileData.email = args.email;
+          if (args.phone) userProfileData.phone = args.phone;
           
           return {
             tool_call_id: toolCall.id,
@@ -265,12 +317,25 @@ router.post('/', chatRateLimiter, validateChatMessage, async (req, res, next) =>
       finalMessage = assistantMessage.content;
 
       // Save assistant message to Supabase (async, non-blocking)
-      if (session.metadata?.clientId) {
-        saveMessage({
-          conversation_id: conversationId,
-          role: 'assistant',
-          content: finalMessage,
-          created_at: new Date().toISOString(),
+      saveMessage({
+        conversation_id: conversationId,
+        session_id: sessionId,
+        role: 'assistant',
+        content: finalMessage,
+        created_at: new Date().toISOString(),
+      }).catch((err) => {
+        logger.error('Failed to save assistant message to Supabase', { error: err.message });
+      });
+      
+      // Save user profile if we captured user data
+      if (Object.keys(userProfileData).length > 0) {
+        upsertUserProfile({
+          session_id: sessionId,
+          ...userProfileData,
+          language: sessionLanguage,
+          last_interaction: new Date().toISOString(),
+        }).catch((err) => {
+          logger.error('Failed to save user profile to Supabase', { error: err.message });
         });
       }
       

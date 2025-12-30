@@ -86,6 +86,40 @@ export async function getClientByIdentifier(identifier, type = 'email') {
 }
 
 /**
+ * Create or update user profile
+ */
+export async function upsertUserProfile(profileData) {
+  try {
+    const client = getSupabaseClient();
+    if (!client) return null;
+
+    const { data, error } = await client
+      .from('user_profiles')
+      .upsert(profileData, {
+        onConflict: 'session_id',
+        ignoreDuplicates: false,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    logger.info('User profile saved to Supabase', {
+      session_id: profileData.session_id,
+    });
+
+    return data;
+  } catch (error) {
+    logger.error('Failed to upsert user profile in Supabase', {
+      error: error.message,
+    });
+    return null;
+  }
+}
+
+/**
  * Create or update client
  */
 export async function upsertClient(clientData) {
@@ -263,6 +297,7 @@ export default {
   getSupabaseClient,
   getClientByIdentifier,
   upsertClient,
+  upsertUserProfile,
   createConversation,
   saveMessage,
   createReservation,
