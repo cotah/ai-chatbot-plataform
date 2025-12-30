@@ -177,34 +177,36 @@ export async function createConversation(conversationData) {
 }
 
 /**
- * Save message to Supabase (async, non-blocking)
+ * Save message to Supabase
  */
 export async function saveMessage(messageData) {
-  // Run asynchronously, don't block
-  setImmediate(async () => {
-    try {
-      const client = getSupabaseClient();
-      if (!client) return;
+  try {
+    const client = getSupabaseClient();
+    if (!client) return null;
 
-      const { error } = await client
-        .from('messages')
-        .insert(messageData);
+    const { data, error } = await client
+      .from('messages')
+      .insert(messageData)
+      .select()
+      .single();
 
-      if (error) {
-        throw error;
-      }
-
-      logger.debug('Message saved to Supabase', {
-        conversationId: messageData.conversation_id,
-      });
-    } catch (error) {
-      logger.error('Failed to save message to Supabase', {
-        error: error.message,
-        conversationId: messageData.conversation_id,
-      });
-      // Don't throw - this is non-blocking
+    if (error) {
+      throw error;
     }
-  });
+
+    logger.info('Message saved to Supabase', {
+      conversationId: messageData.conversation_id,
+      role: messageData.role,
+    });
+
+    return data;
+  } catch (error) {
+    logger.error('Failed to save message to Supabase', {
+      error: error.message,
+      conversationId: messageData.conversation_id,
+    });
+    return null;
+  }
 }
 
 /**

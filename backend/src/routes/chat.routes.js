@@ -208,16 +208,31 @@ router.post('/', chatRateLimiter, validateChatMessage, async (req, res, next) =>
       // Update session with conversation ID
       await updateSession(sessionId, { conversationId });
 
-      // Create conversation in Supabase (async, non-blocking)
-      createConversation({
-        id: conversationId,
-        session_id: sessionId,
-        language: sessionLanguage,
-        intent: 'support',
-        created_at: new Date().toISOString(),
-      }).catch((err) => {
+      // STEP 1: Create user_profile FIRST (to satisfy foreign key)
+      try {
+        await upsertUserProfile({
+          session_id: sessionId,
+          language: sessionLanguage,
+          last_interaction: new Date().toISOString(),
+        });
+        logger.info('User profile created before conversation', { sessionId });
+      } catch (err) {
+        logger.error('Failed to create user profile', { error: err.message });
+      }
+
+      // STEP 2: Create conversation in Supabase (AFTER user_profile exists)
+      try {
+        await createConversation({
+          id: conversationId,
+          session_id: sessionId,
+          language: sessionLanguage,
+          intent: 'support',
+          created_at: new Date().toISOString(),
+        });
+        logger.info('Conversation created in Supabase', { conversationId });
+      } catch (err) {
         logger.error('Failed to create conversation in Supabase', { error: err.message });
-      });
+      }
 
       // Trigger new conversation webhook
       await webhookNewConversation(sessionId, { conversationId }).catch((err) => {
@@ -236,7 +251,8 @@ router.post('/', chatRateLimiter, validateChatMessage, async (req, res, next) =>
     };
     conversation.messages.push(userMessage);
 
-    // Save user message to Supabase (async, non-blocking)
+    // STEP 3: Save user message to Supabase (AFTER conversation exists)
+    // Note: We don't await here to avoid blocking the response
     saveMessage({
       conversation_id: conversationId,
       session_id: sessionId,
