@@ -44,7 +44,7 @@ const ChatbotWidget = ({ theme = {}, isPremium = true }) => { // Enable language
     setAllowedLanguages(['en', 'pt-BR', 'es']);
   }, []);
 
-  const handleSendMessage = async (message, languageOverride = null) => {
+  const handleSendMessage = async (message, languageOverride) => {
     if (!message.trim()) return;
 
     const userMessage = {

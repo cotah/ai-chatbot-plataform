@@ -32,17 +32,17 @@ async function request(path, options = {}) {
   return res.json();
 }
 
-export async function chatAPI({
-  message,
-  conversationId,
-  languageOverride,
-  languageOnly = false, // (fica aqui só pra compatibilidade com o widget)
-}) {
+export async function chatAPI({ message, conversationId, languageOverride, languageOnly = false }) {
   const body = { message };
 
-  // NÃO envie null
   if (conversationId) body.conversationId = conversationId;
-  if (languageOverride) body.languageOverride = languageOverride;
+
+  // ✅ NÃO mande null/undefined/string vazia
+  if (typeof languageOverride === "string" && languageOverride.trim() !== "") {
+    body.languageOverride = languageOverride;
+  }
+
+  if (languageOnly) body.languageOnly = true;
 
   return request("/api/chat", {
     method: "POST",
