@@ -33,21 +33,37 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false,
 }));
 
-// CORS configuration
-app.use(cors({
-  origin: config.server.corsOrigin === '*' ? true : config.server.corsOrigin.split(','),
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Session-ID', 'X-API-Key', 'X-Client-Key'],
-}));
+// --- CORS (PRO) ---
+const vercelPreviewRegex = /^https:\/\/.*\.vercel\.app$/; // aceita qualquer preview da Vercel
+const allowedFixedOrigins = (process.env.CORS_ORIGIN || "")
+  .split(",")
+  .map(s => s.trim())
+  .filter(Boolean);
 
- // Handle preflight (OPTIONS) requests
-app.options('*', cors({
-  origin: config.server.corsOrigin === '*' ? true : config.server.corsOrigin.split(','),
+// Ex.: coloque em CORS_ORIGIN: https://btrix-website.vercel.app,https://ai-chatbot-plataform.vercel.app,http://localhost:5173
+const corsOptions = {
+  origin: (origin, cb) => {
+    // permite requests sem origin (Postman/curl/healthchecks)
+    if (!origin) return cb(null, true);
+
+    const isFixedAllowed = allowedFixedOrigins.includes(origin);
+    const isVercelPreview = vercelPreviewRegex.test(origin);
+    const isLocalhost =
+      origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:");
+
+    if (isFixedAllowed || isVercelPreview || isLocalhost) return cb(null, true);
+
+    return cb(new Error(`CORS blocked for origin: ${origin}`), false);
+  },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Session-ID', 'X-API-Key', 'X-Client-Key'],
-}));
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Session-ID", "X-API-Key", "X-Client-Key"],
+};
+
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions)); // preflight
+// --- /CORS (PRO) ---
+
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));

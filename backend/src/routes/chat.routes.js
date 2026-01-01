@@ -27,14 +27,17 @@ const router = express.Router();
 // In-memory conversation storage (use Redis in production)
 const conversations = new Map();
 
-/**
- * POST /api/chat
- * Main chat endpoint
- */
-/**
- * POST /api/chat/language
- * Change session language
- */
+const sanitizeChatBody = (req, res, next) => {
+  // remove campos nulos/undefined que quebram validação
+  if ('languageOverride' in (req.body || {}) && req.body.languageOverride == null) {
+    delete req.body.languageOverride;
+  }
+  if ('conversationId' in (req.body || {}) && req.body.conversationId == null) {
+    delete req.body.conversationId;
+  }
+  next();
+};
+
 router.post('/language', chatRateLimiter, async (req, res, next) => {
   try {
     const { languageOverride } = req.body;
@@ -85,7 +88,7 @@ router.post('/language', chatRateLimiter, async (req, res, next) => {
   }
 });
 
-router.post('/', chatRateLimiter, validateChatMessage, async (req, res, next) => {
+router.post('/', chatRateLimiter, sanitizeChatBody, validateChatMessage, async (req, res, next) => {
   try {
     const { message, conversationId: providedId, languageOverride } = req.body;
     const sessionId = req.sessionId;
