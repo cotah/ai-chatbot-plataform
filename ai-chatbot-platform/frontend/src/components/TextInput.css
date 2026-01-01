@@ -1,0 +1,71 @@
+.text-input-wrapper {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.text-input {
+  width: 100%;
+  padding: 12px 16px;
+  padding-right: 48px;
+  border: 2px solid rgba(0, 0, 0, 0.1);
+  border-radius: calc(var(--border-radius, 20px) * 0.6);
+  font-size: 14px;
+  font-family: inherit;
+  resize: none;
+  outline: none;
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--text-color, #1a1a1a);
+  transition: all 0.2s;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.text-input:focus {
+  border-color: var(--primary-color, #667eea);
+  background: rgba(255, 255, 255, 1);
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.text-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.text-input::placeholder {
+  color: rgba(0, 0, 0, 0.4);
+}
+
+.text-input-send-button {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: var(--primary-color, #667eea);
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.text-input-send-button:hover:not(:disabled) {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.text-input-send-button:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.text-input-send-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+

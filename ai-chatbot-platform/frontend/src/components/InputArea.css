@@ -1,0 +1,18 @@
+.input-area {
+  padding: 16px 20px;
+  background: var(--background-color, rgba(255, 255, 255, 0.95));
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.input-area-container {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.input-area-buttons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+

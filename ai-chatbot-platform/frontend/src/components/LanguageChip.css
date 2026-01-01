@@ -1,0 +1,110 @@
+.language-chip-container {
+  position: relative;
+}
+
+.language-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border: none;
+  transition: all 0.2s;
+}
+
+.language-chip-readonly {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  cursor: default;
+}
+
+.language-chip-interactive {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  cursor: pointer;
+}
+
+.language-chip-interactive:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.05);
+}
+
+.language-chip-text {
+  line-height: 1;
+}
+
+.language-chip-arrow {
+  transition: transform 0.2s;
+  color: currentColor;
+}
+
+.language-chip-arrow.open {
+  transform: rotate(180deg);
+}
+
+.language-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  min-width: 160px;
+  overflow: hidden;
+  z-index: 1000;
+  animation: dropdownSlide 0.2s ease-out;
+}
+
+@keyframes dropdownSlide {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.language-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.2s;
+  text-align: left;
+  color: #1a1a1a;
+}
+
+.language-option:hover {
+  background: rgba(102, 126, 234, 0.1);
+}
+
+.language-option.active {
+  background: rgba(102, 126, 234, 0.15);
+  color: var(--primary-color, #667eea);
+  font-weight: 600;
+}
+
+.language-option-code {
+  font-weight: 600;
+  min-width: 28px;
+  font-size: 12px;
+}
+
+.language-option-name {
+  flex: 1;
+  font-size: 13px;
+}
+
+.language-option svg {
+  color: var(--primary-color, #667eea);
+  flex-shrink: 0;
+}
+
