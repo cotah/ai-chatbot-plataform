@@ -41,6 +41,15 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Session-ID', 'X-API-Key', 'X-Client-Key'],
 }));
 
+ // Handle preflight (OPTIONS) requests
+app.options('*', cors({
+  origin: config.server.corsOrigin === '*' ? true : config.server.corsOrigin.split(','),
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Session-ID', 'X-API-Key', 'X-Client-Key'],
+}));
+
+
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
