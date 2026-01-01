@@ -32,17 +32,20 @@ async function request(path, options = {}) {
   return res.json();
 }
 
-export async function chatAPI({ message, conversationId, languageOverride, languageOnly = false }) {
+export async function chatAPI({
+  message,
+  conversationId,
+  languageOverride,
+  languageOnly = false,
+}) {
   const body = { message };
 
   if (conversationId) body.conversationId = conversationId;
 
-  // ✅ NÃO mande null/undefined/string vazia
-  if (typeof languageOverride === "string" && languageOverride.trim() !== "") {
+  // ✅ só envia se tiver valor
+  if (languageOverride !== null && languageOverride !== undefined && languageOverride !== "") {
     body.languageOverride = languageOverride;
   }
-
-  if (languageOnly) body.languageOnly = true;
 
   return request("/api/chat", {
     method: "POST",
