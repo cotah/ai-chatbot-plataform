@@ -49,18 +49,16 @@ async function generateQueryEmbedding(query) {
 async function searchChunks(embedding, options = {}) {
   const {
     maxChunks = RAG_CONFIG.maxChunks,
-    minSimilarity = RAG_CONFIG.minSimilarity,
-    version = RAG_CONFIG.version,
-    tags = null,
+    brainId = 'btrix-core',
+    source = null,
   } = options;
   
   try {
-    const { data, error } = await supabase.rpc('match_brain_chunks', {
-      query_embedding: embedding,
-      match_threshold: minSimilarity,
-      match_count: maxChunks,
-      filter_version: version,
-      filter_tags: tags,
+    const { data, error } = await supabase.rpc('match_knowledge_chunks', {
+      p_brain_id: brainId,
+      p_query_embedding: embedding,
+      p_match_count: maxChunks,
+      p_source: source,
     });
     
     if (error) {
@@ -70,7 +68,7 @@ async function searchChunks(embedding, options = {}) {
     
     logger.info('Chunks retrieved', {
       count: data?.length || 0,
-      minSimilarity,
+      brainId,
       maxChunks,
     });
     
@@ -100,7 +98,7 @@ function buildContext(chunks, maxChars = RAG_CONFIG.maxContextChars) {
   let chunksUsed = 0;
   
   for (const chunk of chunks) {
-    const chunkText = `[Source: ${chunk.source} - ${chunk.section}]\n${chunk.content}\n`;
+    const chunkText = `[Source: ${chunk.source} - ${chunk.title || 'Untitled'}]\n${chunk.content}\n`;
     const chunkLength = chunkText.length;
     
     // Stop if adding this chunk would exceed limit
@@ -126,9 +124,9 @@ function buildContext(chunks, maxChars = RAG_CONFIG.maxContextChars) {
     sources: Array.from(sources),
     chunks: chunks.slice(0, chunksUsed).map(c => ({
       source: c.source,
-      section: c.section,
+      title: c.title,
       similarity: c.similarity,
-      tokenCount: c.token_count,
+      tokenCount: c.metadata?.token_count || 0,
     })),
   };
 }
