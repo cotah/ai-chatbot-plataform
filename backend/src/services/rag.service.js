@@ -21,10 +21,61 @@ const openai = new OpenAI({
 // RAG Configuration
 const RAG_CONFIG = {
   maxChunks: 8,              // Maximum number of chunks to retrieve
-  minSimilarity: 0.7,        // Minimum similarity threshold (0-1)
+  minSimilarity: 0.55,       // Minimum similarity threshold (0-1) - anti-hallucination
   maxContextChars: 12000,    // Maximum context size in characters
-  version: '1.0.0',          // Brain version to use
+  version: '1.0.1',          // Brain version to use
 };
+
+/**
+ * Classify user intent from query
+ * Returns tags to filter knowledge chunks
+ */
+function classifyIntent(query) {
+  const lowerQuery = query.toLowerCase();
+  const tags = [];
+  
+  // Pricing intent
+  if (lowerQuery.match(/price|cost|quanto custa|how much|pricing|€|euro|dollar|payment|pay/)) {
+    tags.push('pricing');
+  }
+  
+  // Agents intent
+  if (lowerQuery.match(/agent|agente|sales|marketing|finance|inventory|social media|design|video/)) {
+    tags.push('agents');
+  }
+  
+  // Support intent
+  if (lowerQuery.match(/support|help|ajuda|suporte|contact|contato|24\/7|assistance/)) {
+    tags.push('support');
+  }
+  
+  // Limits intent
+  if (lowerQuery.match(/not|don't|cannot|can't|limit|restriction|não|nao faz|doesn't/)) {
+    tags.push('limits');
+  }
+  
+  // Enterprise intent
+  if (lowerQuery.match(/enterprise|custom|large|big company|grande empresa|personalizado/)) {
+    tags.push('enterprise');
+  }
+  
+  // Roadmap intent
+  if (lowerQuery.match(/future|roadmap|coming|next|quando|when|plan|planejamento/)) {
+    tags.push('roadmap');
+  }
+  
+  // Packs intent
+  if (lowerQuery.match(/pack|essential|pro|plano|plan|package/)) {
+    tags.push('packs');
+  }
+  
+  logger.info('Intent classified', {
+    query: query.substring(0, 50),
+    tags: tags.length > 0 ? tags : ['none'],
+  });
+  
+  return tags.length > 0 ? tags : null;
+}
 
 /**
  * Generate embedding for query
@@ -51,6 +102,7 @@ async function searchChunks(embedding, options = {}) {
     maxChunks = RAG_CONFIG.maxChunks,
     brainId = 'btrix-core',
     source = null,
+    tags = null,
   } = options;
   
   try {
@@ -59,6 +111,7 @@ async function searchChunks(embedding, options = {}) {
       p_query_embedding: embedding,
       p_match_count: maxChunks,
       p_source: source,
+      p_tags: tags,
     });
     
     if (error) {
@@ -70,6 +123,7 @@ async function searchChunks(embedding, options = {}) {
       count: data?.length || 0,
       brainId,
       maxChunks,
+      tags: tags || 'none',
     });
     
     return data || [];
@@ -138,13 +192,42 @@ export async function retrieveBrainContext(query, options = {}) {
   try {
     logger.info('RAG retrieval started', { query: query.substring(0, 100) });
     
-    // Step 1: Generate embedding for query
+    // Step 1: Classify intent and extract tags
+    const intentTags = classifyIntent(query);
+    
+    // Step 2: Generate embedding for query
     const embedding = await generateQueryEmbedding(query);
     
-    // Step 2: Search for relevant chunks
-    const chunks = await searchChunks(embedding, options);
+    // Step 3: Search for relevant chunks with tags filter
+    const chunks = await searchChunks(embedding, {
+      ...options,
+      tags: intentTags,
+    });
     
-    // Step 3: Build context with character limit
+    // Step 4: Check similarity threshold (anti-hallucination)
+    const topSimilarity = chunks.length > 0 ? chunks[0].similarity : 0;
+    const belowThreshold = topSimilarity < RAG_CONFIG.minSimilarity;
+    
+    if (belowThreshold) {
+      logger.warn('Top chunk below similarity threshold', {
+        topSimilarity,
+        threshold: RAG_CONFIG.minSimilarity,
+        query: query.substring(0, 50),
+      });
+      
+      return {
+        context: '',
+        chunksUsed: 0,
+        totalChars: 0,
+        sources: [],
+        chunks: [],
+        belowThreshold: true,
+        topSimilarity,
+        intentTags,
+      };
+    }
+    
+    // Step 5: Build context with character limit
     const result = buildContext(chunks, options.maxContextChars);
     
     logger.info('RAG retrieval complete', {
@@ -152,9 +235,16 @@ export async function retrieveBrainContext(query, options = {}) {
       chunksUsed: result.chunksUsed,
       totalChars: result.totalChars,
       sources: result.sources,
+      topSimilarity,
+      intentTags,
     });
     
-    return result;
+    return {
+      ...result,
+      belowThreshold: false,
+      topSimilarity,
+      intentTags,
+    };
   } catch (error) {
     logger.error('Error in retrieveBrainContext', {
       error: error.message,
@@ -203,13 +293,21 @@ Professional, calm, confident, and helpful without being pushy.`;
   // Retrieve relevant context
   const ragResult = await retrieveBrainContext(query, {
     maxChunks: 6,
-    minSimilarity: 0.7,
   });
   
   // Combine base prompt with context
   let fullPrompt = basePrompt;
   
-  if (ragResult.context) {
+  // Check if below threshold (anti-hallucination)
+  if (ragResult.belowThreshold) {
+    const fallbackMessage = sessionLanguage === 'pt-BR'
+      ? 'Pode ser que eu não tenha informação suficiente na minha base de conhecimento para responder com precisão. Quer falar com a BTRIX para confirmar os detalhes?'
+      : sessionLanguage === 'es'
+      ? '¿Puede ser que no tenga suficiente información en mi base de conocimientos para responder con precisión. ¿Quieres hablar con BTRIX para confirmar los detalles?'
+      : 'I may not have enough information in my current knowledge base to answer precisely. Want to talk to BTRIX to confirm details?';
+    
+    fullPrompt += `\n\n## IMPORTANT - Low Confidence Warning\n\nThe top relevant chunk has similarity ${ragResult.topSimilarity?.toFixed(2)} which is below the threshold (0.55).\n\nYou MUST respond with:\n"${fallbackMessage}"\n\nDO NOT attempt to answer the question. DO NOT invent information.`;
+  } else if (ragResult.context) {
     fullPrompt += `\n\n## Relevant Knowledge\n\nUse the following information to answer the user's question:\n\n${ragResult.context}`;
   } else {
     fullPrompt += `\n\n## Note\n\nNo specific knowledge was retrieved for this query. Provide a helpful general response and offer to schedule a demo for detailed information.`;
