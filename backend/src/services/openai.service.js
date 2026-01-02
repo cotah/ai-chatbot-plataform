@@ -6,7 +6,7 @@
 import OpenAI from 'openai';
 import config from '../config/index.js';
 import logger from '../utils/logger.js';
-import { getCondensedSystemPrompt } from './brain.service.js';
+import { getSystemPromptWithContext } from './rag.service.js';
 
 const openai = new OpenAI({
   apiKey: config.openai.apiKey,
@@ -26,26 +26,23 @@ function getLanguageInstructions(sessionLanguage) {
 }
 
 /**
- * Generate system prompt with language context
+ * Generate system prompt with language context and RAG
  */
-export function getSystemPrompt(sessionLanguage) {
+export async function getSystemPrompt(sessionLanguage, userQuery = '') {
+  // Use RAG to get context-aware system prompt
+  if (userQuery) {
+    const { prompt } = await getSystemPromptWithContext(userQuery, sessionLanguage);
+    return prompt;
+  }
+  
+  // Fallback to basic prompt if no query provided
   const languageInstructions = getLanguageInstructions(sessionLanguage);
-  
-  // Load system prompt from BTRIX Brain
-  let brainPrompt = getCondensedSystemPrompt();
-  
-  // Add language instructions
-  const fullPrompt = `${brainPrompt}
-
----
-
-## Language Instructions
+  return `You are BTRIX, an AI assistant for the BTRIX business operating system.
 
 ${languageInstructions}
 
-**Important**: NEVER mix languages in your responses. Respond ONLY in the session language.`;
-  
-  return fullPrompt;
+Your goal is to qualify leads, answer questions, and guide prospects toward scheduling a demo.
+Be professional, calm, and helpful. Always tell the truth and never invent information.`;
 }
 
 /**
@@ -152,7 +149,7 @@ export const TOOLS = [
 ];
 
 /**
- * Chat completion with function calling
+ * Chat completion with function calling and RAG
  */
 export async function chatCompletion(messages, conversationId = null, sessionLanguage = 'en') {
   try {
@@ -162,7 +159,18 @@ export async function chatCompletion(messages, conversationId = null, sessionLan
       sessionLanguage,
     });
 
-    const systemPrompt = getSystemPrompt(sessionLanguage);
+    // Get last user message for RAG context
+    const lastUserMessage = messages.filter(m => m.role === 'user').pop();
+    const userQuery = lastUserMessage?.content || '';
+
+    // Get system prompt with RAG context
+    const { prompt: systemPrompt, metadata } = await getSystemPromptWithContext(userQuery, sessionLanguage);
+    
+    logger.info('RAG context retrieved', {
+      conversationId,
+      chunksUsed: metadata.chunksUsed,
+      sources: metadata.sources,
+    });
 
     const response = await openai.chat.completions.create({
       model: config.openai.model,
@@ -184,12 +192,14 @@ export async function chatCompletion(messages, conversationId = null, sessionLan
       conversationId,
       finishReason: completion.finish_reason,
       hasToolCalls: !!completion.message.tool_calls,
+      ragMetadata: metadata,
     });
 
     return {
       message: completion.message,
       usage: response.usage,
       finishReason: completion.finish_reason,
+      ragMetadata: metadata,
     };
   } catch (error) {
     logger.error('OpenAI chat completion error', {
