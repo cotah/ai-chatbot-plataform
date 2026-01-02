@@ -24,7 +24,8 @@ const RAG_CONFIG = {
   maxChunks: 8,              // Maximum number of chunks to retrieve
   minSimilarity: 0.55,       // Minimum similarity threshold (0-1) - anti-hallucination
   maxContextChars: 12000,    // Maximum context size in characters
-  version: '1.0.1',          // Brain version to use
+  brainId: config.brain.id,  // Brain ID (versioned)
+  brainVersion: config.brain.version, // Brain version
 };
 
 /**
@@ -101,7 +102,7 @@ async function generateQueryEmbedding(query) {
 async function searchChunks(embedding, options = {}) {
   const {
     maxChunks = RAG_CONFIG.maxChunks,
-    brainId = 'btrix-core',
+    brainId = RAG_CONFIG.brainId,
     source = null,
     tags = null,
   } = options;

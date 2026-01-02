@@ -88,6 +88,12 @@ export const config = {
     url: process.env.SUPABASE_URL,
     serviceKey: process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY,
   },
+
+  brain: {
+    version: process.env.BRAIN_VERSION || '1.0.2',
+    id: `btrix-brain:${process.env.BRAIN_VERSION || '1.0.2'}`,
+    rollbackVersion: process.env.BRAIN_ROLLBACK_VERSION || null,
+  },
 };
 
 export default config;

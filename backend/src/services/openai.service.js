@@ -7,6 +7,7 @@ import OpenAI from 'openai';
 import config from '../config/index.js';
 import logger from '../utils/logger.js';
 import { getSystemPromptWithContext } from './rag.service.js';
+import { checkPriceGuardrails, getPriceGuardrailFallback, logPriceViolation } from './priceGuardrails.service.js';
 
 const openai = new OpenAI({
   apiKey: config.openai.apiKey,
@@ -195,11 +196,48 @@ export async function chatCompletion(messages, conversationId = null, sessionLan
       ragMetadata: metadata,
     });
 
+    // POST-CHECK: Price guardrails validation
+    const responseText = completion.message.content || '';
+    const guardrailCheck = checkPriceGuardrails(responseText);
+    
+    if (!guardrailCheck.passed) {
+      // Log violation with full context
+      logPriceViolation({
+        query: userQuery,
+        response: responseText,
+        detectedPrices: guardrailCheck.detectedPrices,
+        invalidPrices: guardrailCheck.invalidPrices,
+        brainVersion: metadata.brainVersion || '1.0.2',
+        conversationId,
+        userId: null, // Add userId if available
+      });
+      
+      // DISCARD response and FORCE fallback
+      const fallbackMessage = getPriceGuardrailFallback(sessionLanguage);
+      
+      logger.warn('Response blocked by price guardrails, forcing fallback', {
+        conversationId,
+        invalidPrices: guardrailCheck.invalidPrices,
+      });
+      
+      return {
+        message: {
+          role: 'assistant',
+          content: fallbackMessage,
+        },
+        usage: response.usage,
+        finishReason: 'guardrail_blocked',
+        ragMetadata: metadata,
+        guardrailViolation: true,
+      };
+    }
+
     return {
       message: completion.message,
       usage: response.usage,
       finishReason: completion.finish_reason,
       ragMetadata: metadata,
+      guardrailViolation: false,
     };
   } catch (error) {
     logger.error('OpenAI chat completion error', {
