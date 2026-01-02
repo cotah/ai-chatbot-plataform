@@ -20,12 +20,16 @@ import reservationsRoutes from './routes/reservations.routes.js';
 import ordersRoutes from './routes/orders.routes.js';
 import videoRoutes from './routes/video.routes.js';
 import healthRoutes from './routes/health.routes.js';
+import metricsRoutes from './routes/metrics.routes.js';
 
 const app = express();
 app.set("trust proxy", 1);
 
 app.get("/", (req, res) => res.status(200).send("OK"));
 app.head("/", (req, res) => res.sendStatus(200));
+
+// Dashboard redirect
+app.get("/dashboard", (req, res) => res.redirect('/dashboard/dashboard.html'));
 
 // Security middleware
 app.use(helmet({
@@ -69,6 +73,9 @@ app.options("*", cors(corsOptions)); // preflight
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Serve static files (dashboard)
+app.use('/dashboard', express.static('public'));
+
 // Session middleware (must be before routes)
 app.use(sessionMiddleware);
 
@@ -90,6 +97,7 @@ app.use('/api/reservations', reservationsRoutes);
 app.use('/api/orders', ordersRoutes);
 app.use('/api/video', videoRoutes);
 app.use('/api/health', healthRoutes);
+app.use('/api/metrics', metricsRoutes);
 
 // 404 handler
 app.use(notFoundHandler);

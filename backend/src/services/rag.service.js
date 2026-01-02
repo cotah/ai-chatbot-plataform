@@ -7,6 +7,7 @@ import { createClient } from '@supabase/supabase-js';
 import OpenAI from 'openai';
 import config from '../config/index.js';
 import logger from '../utils/logger.js';
+import { logRAGRequest, logRAGError, metricsCollector } from './observability.service.js';
 
 // Initialize clients
 const supabase = createClient(
@@ -189,6 +190,9 @@ function buildContext(chunks, maxChars = RAG_CONFIG.maxContextChars) {
  * Retrieve relevant context for a query (main RAG function)
  */
 export async function retrieveBrainContext(query, options = {}) {
+  const startTime = Date.now();
+  let retrievalStartTime;
+  
   try {
     logger.info('RAG retrieval started', { query: query.substring(0, 100) });
     
@@ -196,6 +200,7 @@ export async function retrieveBrainContext(query, options = {}) {
     const intentTags = classifyIntent(query);
     
     // Step 2: Generate embedding for query
+    retrievalStartTime = Date.now();
     const embedding = await generateQueryEmbedding(query);
     
     // Step 3: Search for relevant chunks with tags filter
@@ -203,6 +208,7 @@ export async function retrieveBrainContext(query, options = {}) {
       ...options,
       tags: intentTags,
     });
+    const retrievalTime = Date.now() - retrievalStartTime;
     
     // Step 4: Check similarity threshold (anti-hallucination)
     const topSimilarity = chunks.length > 0 ? chunks[0].similarity : 0;
@@ -214,6 +220,24 @@ export async function retrieveBrainContext(query, options = {}) {
         threshold: RAG_CONFIG.minSimilarity,
         query: query.substring(0, 50),
       });
+      
+      const totalTime = Date.now() - startTime;
+      
+      // Log for observability
+      const logData = {
+        query,
+        language: options.language,
+        intentTags,
+        topSimilarity,
+        belowThreshold: true,
+        chunkIds: [],
+        retrievalTime,
+        totalTime,
+        conversationId: options.conversationId,
+        userId: options.userId,
+      };
+      logRAGRequest(logData);
+      metricsCollector.recordRequest(logData);
       
       return {
         context: '',
@@ -230,6 +254,8 @@ export async function retrieveBrainContext(query, options = {}) {
     // Step 5: Build context with character limit
     const result = buildContext(chunks, options.maxContextChars);
     
+    const totalTime = Date.now() - startTime;
+    
     logger.info('RAG retrieval complete', {
       chunksRetrieved: chunks.length,
       chunksUsed: result.chunksUsed,
@@ -238,6 +264,23 @@ export async function retrieveBrainContext(query, options = {}) {
       topSimilarity,
       intentTags,
     });
+    
+    // Log for observability
+    const chunkIds = result.chunks?.map(c => c.id) || [];
+    const logData = {
+      query,
+      language: options.language,
+      intentTags,
+      topSimilarity,
+      belowThreshold: false,
+      chunkIds,
+      retrievalTime,
+      totalTime,
+      conversationId: options.conversationId,
+      userId: options.userId,
+    };
+    logRAGRequest(logData);
+    metricsCollector.recordRequest(logData);
     
     return {
       ...result,
@@ -249,6 +292,13 @@ export async function retrieveBrainContext(query, options = {}) {
     logger.error('Error in retrieveBrainContext', {
       error: error.message,
       query: query.substring(0, 100),
+    });
+    
+    // Log error for observability
+    logRAGError(error, {
+      query,
+      intentTags: null,
+      conversationId: options.conversationId,
     });
     
     // Return empty context on error (graceful degradation)
@@ -300,13 +350,41 @@ Professional, calm, confident, and helpful without being pushy.`;
   
   // Check if below threshold (anti-hallucination)
   if (ragResult.belowThreshold) {
-    const fallbackMessage = sessionLanguage === 'pt-BR'
-      ? 'Pode ser que eu não tenha informação suficiente na minha base de conhecimento para responder com precisão. Quer falar com a BTRIX para confirmar os detalhes?'
-      : sessionLanguage === 'es'
-      ? '¿Puede ser que no tenga suficiente información en mi base de conocimientos para responder con precisión. ¿Quieres hablar con BTRIX para confirmar los detalles?'
-      : 'I may not have enough information in my current knowledge base to answer precisely. Want to talk to BTRIX to confirm details?';
+    // Intelligent fallback with guided options
+    const fallbackMessages = {
+      en: {
+        message: "I may not have enough information to answer precisely. To help you better, could you clarify what you're looking for?",
+        options: [
+          "💰 Pricing & Plans",
+          "🤖 AI Agents",
+          "📞 Support & Contact",
+          "🏢 Enterprise Solutions"
+        ]
+      },
+      'pt-BR': {
+        message: "Pode ser que eu não tenha informação suficiente para responder com precisão. Para te ajudar melhor, você poderia esclarecer o que procura?",
+        options: [
+          "💰 Preços e Planos",
+          "🤖 Agentes AI",
+          "📞 Suporte e Contato",
+          "🏢 Soluções Enterprise"
+        ]
+      },
+      es: {
+        message: "Puede ser que no tenga suficiente información para responder con precisión. Para ayudarte mejor, ¿podrías aclarar lo que buscas?",
+        options: [
+          "💰 Precios y Planes",
+          "🤖 Agentes AI",
+          "📞 Soporte y Contacto",
+          "🏢 Soluciones Enterprise"
+        ]
+      }
+    };
     
-    fullPrompt += `\n\n## IMPORTANT - Low Confidence Warning\n\nThe top relevant chunk has similarity ${ragResult.topSimilarity?.toFixed(2)} which is below the threshold (0.55).\n\nYou MUST respond with:\n"${fallbackMessage}"\n\nDO NOT attempt to answer the question. DO NOT invent information.`;
+    const fallback = fallbackMessages[sessionLanguage] || fallbackMessages.en;
+    const optionsText = fallback.options.join('\n');
+    
+    fullPrompt += `\n\n## IMPORTANT - Low Confidence Warning\n\nThe top relevant chunk has similarity ${ragResult.topSimilarity?.toFixed(2)} which is below the threshold (0.55).\n\nYou MUST respond with:\n\n"${fallback.message}\n\n${optionsText}"\n\nDO NOT attempt to answer the question. DO NOT invent information. Guide the user to clarify their intent.`;
   } else if (ragResult.context) {
     fullPrompt += `\n\n## Relevant Knowledge\n\nUse the following information to answer the user's question:\n\n${ragResult.context}`;
   } else {
