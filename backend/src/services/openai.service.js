@@ -6,6 +6,7 @@
 import OpenAI from 'openai';
 import config from '../config/index.js';
 import logger from '../utils/logger.js';
+import { getCondensedSystemPrompt } from './brain.service.js';
 
 const openai = new OpenAI({
   apiKey: config.openai.apiKey,
@@ -30,47 +31,21 @@ function getLanguageInstructions(sessionLanguage) {
 export function getSystemPrompt(sessionLanguage) {
   const languageInstructions = getLanguageInstructions(sessionLanguage);
   
-  return `You are a professional, warm, and helpful AI assistant for a hospitality business. You are a MULTILINGUAL ASSISTANT capable of communicating in multiple languages.
+  // Load system prompt from BTRIX Brain
+  let brainPrompt = getCondensedSystemPrompt();
+  
+  // Add language instructions
+  const fullPrompt = `${brainPrompt}
+
+---
+
+## Language Instructions
 
 ${languageInstructions}
 
-Your role is to assist customers with:
-
-1. **General Information**: Answer questions about business hours, location, services, policies, and FAQs. Be concise, professional, and warm.
-
-2. **Reservations**: Help customers make reservations by collecting:
-   - Name
-   - Phone number
-   - Email address
-   - Date and time
-   - Number of guests
-   
-   Once you have all information, use the create_reservation tool.
-
-3. **Orders**: Help customers place pickup orders. When ready, use the create_order tool to initiate payment.
-
-4. **Menu**: When customers ask about the menu, inform them that the menu is available via video content and provide a YouTube channel or playlist link. Explain that each item is presented in a short video format.
-
-5. **Video Support**: Offer "Video Assistance" when:
-   - The customer requests it
-   - The conversation becomes complex
-   - You need to show something visually
-   
-   Use the create_video_session tool when appropriate.
-
-6. **Human Handoff**: If the customer explicitly requests to speak with a human, or if you're unable to help, provide a WhatsApp link for direct contact.
-
-**Important Guidelines**:
-- Be conversational and natural
-- Ask clarifying questions when needed
-- Confirm important details before taking actions
-- If you don't know something, admit it and offer alternatives
-- Always confirm reservations and orders before finalizing
-- Use tools only when you have complete information
-- NEVER mix languages in your responses - respond ONLY in the session language
-- If the user asks to change language, comply only if the language is allowed by the system configuration
-
-**Tone**: Professional, warm, concise, and helpful.`;
+**Important**: NEVER mix languages in your responses. Respond ONLY in the session language.`;
+  
+  return fullPrompt;
 }
 
 /**
@@ -80,153 +55,94 @@ export const SYSTEM_PROMPT = getSystemPrompt('en');
 
 /**
  * Tool definitions for function calling
+ * Focused on lead qualification and demo scheduling
  */
 export const TOOLS = [
   {
     type: 'function',
     function: {
-      name: 'create_reservation',
-      description: 'Create a reservation for a customer. Use this when you have collected all required information: name, phone, email, date, time, and number of guests.',
+      name: 'qualify_lead',
+      description: 'Qualify a lead by collecting business information. Use this after gathering: business type, main channel, lead volume, and main goal.',
+      parameters: {
+        type: 'object',
+        properties: {
+          businessType: {
+            type: 'string',
+            description: 'Type of business (e.g., "clinic", "restaurant", "e-commerce", "real estate")',
+          },
+          mainChannel: {
+            type: 'string',
+            description: 'Main customer communication channel (e.g., "WhatsApp", "email", "phone", "Instagram")',
+          },
+          leadVolume: {
+            type: 'string',
+            description: 'Approximate lead/message volume per day (e.g., "10-50", "50-200", "200+")',
+          },
+          mainGoal: {
+            type: 'string',
+            description: 'Main automation goal (e.g., "sales", "support", "scheduling", "operations")',
+          },
+          recommendedPack: {
+            type: 'string',
+            description: 'Recommended BTRIX pack based on qualification ("Essential", "Pro", or "Enterprise")',
+          },
+        },
+        required: ['businessType', 'mainChannel', 'leadVolume', 'mainGoal', 'recommendedPack'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'schedule_demo',
+      description: 'Collect contact information to schedule a demo. Use this when the lead is qualified and interested in seeing BTRIX in action.',
       parameters: {
         type: 'object',
         properties: {
           name: {
             type: 'string',
-            description: 'Customer full name',
-          },
-          phone: {
-            type: 'string',
-            description: 'Customer phone number',
+            description: 'Lead full name',
           },
           email: {
             type: 'string',
-            description: 'Customer email address',
+            description: 'Lead email address',
           },
-          date: {
+          phone: {
             type: 'string',
-            description: 'Reservation date in ISO 8601 format (YYYY-MM-DD)',
+            description: 'Lead phone number (with country code if possible)',
           },
-          time: {
+          company: {
             type: 'string',
-            description: 'Reservation time in HH:MM format (24-hour)',
+            description: 'Company name (optional)',
           },
-          guests: {
-            type: 'number',
-            description: 'Number of guests',
+          preferredTime: {
+            type: 'string',
+            description: 'Preferred time for demo (e.g., "morning", "afternoon", "specific date/time")',
           },
           notes: {
             type: 'string',
-            description: 'Additional notes or special requests',
+            description: 'Additional notes or specific questions for the demo',
           },
         },
-        required: ['name', 'phone', 'email', 'date', 'time', 'guests'],
+        required: ['name', 'email', 'phone'],
       },
     },
   },
   {
     type: 'function',
     function: {
-      name: 'create_order',
-      description: 'Create a pickup order with payment. Use this when the customer is ready to place an order and you have all item details.',
-      parameters: {
-        type: 'object',
-        properties: {
-          items: {
-            type: 'array',
-            description: 'Array of order items',
-            items: {
-              type: 'object',
-              properties: {
-                name: {
-                  type: 'string',
-                  description: 'Item name',
-                },
-                quantity: {
-                  type: 'number',
-                  description: 'Item quantity',
-                },
-                price: {
-                  type: 'number',
-                  description: 'Item price in the currency unit',
-                },
-              },
-              required: ['name', 'quantity', 'price'],
-            },
-          },
-          customerName: {
-            type: 'string',
-            description: 'Customer full name',
-          },
-          customerPhone: {
-            type: 'string',
-            description: 'Customer phone number',
-          },
-          customerEmail: {
-            type: 'string',
-            description: 'Customer email address',
-          },
-          notes: {
-            type: 'string',
-            description: 'Special instructions or notes',
-          },
-        },
-        required: ['items', 'customerName', 'customerPhone', 'customerEmail'],
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'get_menu_link',
-      description: 'Get the YouTube channel or playlist link for the menu. Use this when customer asks about menu items.',
-      parameters: {
-        type: 'object',
-        properties: {
-          category: {
-            type: 'string',
-            description: 'Menu category if specified (e.g., "appetizers", "main courses", "desserts")',
-          },
-        },
-        required: [],
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'create_video_session',
-      description: 'Create a video avatar session for visual assistance. Use this when customer requests video help or when visual demonstration would be helpful.',
+      name: 'provide_whatsapp_contact',
+      description: 'Provide WhatsApp contact for direct communication. Use when lead prefers WhatsApp or needs immediate human assistance.',
       parameters: {
         type: 'object',
         properties: {
           reason: {
             type: 'string',
-            description: 'Reason for video session (e.g., "customer requested", "complex explanation needed")',
+            description: 'Reason for WhatsApp contact (e.g., "lead prefers WhatsApp", "complex question", "urgent request")',
           },
-          conversationContext: {
+          prefilledMessage: {
             type: 'string',
-            description: 'Brief context of the conversation to help the video avatar',
-          },
-        },
-        required: ['reason'],
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'provide_whatsapp_link',
-      description: 'Provide WhatsApp contact link for human support. Use this when customer explicitly requests human help or when you cannot assist further.',
-      parameters: {
-        type: 'object',
-        properties: {
-          reason: {
-            type: 'string',
-            description: 'Reason for WhatsApp handoff (e.g., "customer requested human", "complex issue")',
-          },
-          message: {
-            type: 'string',
-            description: 'Pre-filled message for WhatsApp',
+            description: 'Pre-filled message for WhatsApp with context',
           },
         },
         required: ['reason'],
