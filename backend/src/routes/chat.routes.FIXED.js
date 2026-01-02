@@ -246,6 +246,7 @@ router.post('/', chatRateLimiter, validateChatMessage, async (req, res, next) =>
           id: conversationId,
           session_id: sessionId,
           language: sessionLanguage || 'en',
+          origin: 'chatbot',
           created_at: new Date().toISOString(),
         });
         logger.info('Conversation saved to Supabase', { conversationId, sessionId });

@@ -230,6 +230,7 @@ router.post('/', chatRateLimiter, sanitizeChatBody, validateChatMessage, async (
           session_id: sessionId,
           language: sessionLanguage,
           intent: 'support',
+          origin: 'chatbot',
           created_at: new Date().toISOString(),
         });
         logger.info('Conversation created in Supabase', { conversationId });

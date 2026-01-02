@@ -418,6 +418,15 @@ Para questões e suporte:
 
 ---
 
+## 📝 Changelog
+
+### [2025-01-02] - Added conversation origin tracking
+- Added `origin` field to conversations table to track source channel (chatbot, whatsapp, etc.)
+- All new conversations from the chatbot widget are now marked with `origin: 'chatbot'`
+- Prepared for future multi-channel support (WhatsApp, Instagram, Email, etc.)
+
+---
+
 ## 🎉 Status do Projeto
 
 **✅ COMPLETO E TESTADO**
