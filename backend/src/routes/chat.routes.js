@@ -14,6 +14,8 @@ import { chatRateLimiter } from '../middleware/rateLimiter.js';
 import { validateChatMessage } from '../middleware/validator.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { validateMessageFormat, getMessageMetrics } from '../services/messageFormatter.service.js';
+import { handleConversation, confirmBooking } from '../services/conversationHandler.service.js';
+import { STATES } from '../services/conversationState.service.js';
 import {
   getSessionLanguage,
   checkLanguageChangeRequest,
@@ -27,6 +29,9 @@ const router = express.Router();
 
 // In-memory conversation storage (use Redis in production)
 const conversations = new Map();
+
+// In-memory session state storage (use Redis in production)
+const sessionStates = new Map();
 
 const sanitizeChatBody = (req, res, next) => {
   // remove campos nulos/undefined que quebram validação
@@ -268,15 +273,48 @@ router.post('/', chatRateLimiter, sanitizeChatBody, validateChatMessage, async (
       logger.error('Failed to save user message to Supabase', { error: err.message });
     });
 
-    // Get AI response with session language
-    const completion = await chatCompletion(conversation.messages, conversationId, sessionLanguage);
+    // STEP 3.5: Handle conversation with state machine
+    // Get or initialize session state
+    let sessionState = sessionStates.get(sessionId);
+    const conversationResult = await handleConversation(sessionState, message, sessionId);
+    
+    // Update session state
+    sessionStates.set(sessionId, conversationResult.newState);
+    
+    // Check if response is from state machine (scripted) or needs RAG
+    let finalMessage;
+    let completion;
+    
+    if (conversationResult.response.useRAG) {
+      // Use RAG for this response
+      logger.info('Using RAG for response', { sessionId, state: conversationResult.newState.current });
+      completion = await chatCompletion(conversation.messages, conversationId, sessionLanguage);
+      finalMessage = completion.message.content;
+    } else {
+      // Use scripted response from state machine
+      logger.info('Using scripted response', { sessionId, state: conversationResult.newState.current });
+      finalMessage = conversationResult.response.message;
+      
+      // Create mock completion object for consistency
+      completion = {
+        message: {
+          role: 'assistant',
+          content: finalMessage,
+          tool_calls: null,
+        },
+        usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+      };
+    }
+    
+    // Get AI response with session language (ONLY if not using scripted response)
+    // const completion = await chatCompletion(conversation.messages, conversationId, sessionLanguage);
 
     // Add assistant message
     conversation.messages.push(completion.message);
 
     // Handle tool calls
     let toolResults = [];
-    let finalMessage = completion.message.content;
+    // finalMessage already defined above from state machine or RAG
     let userProfileData = {};
     
     if (completion.message.tool_calls && completion.message.tool_calls.length > 0) {
