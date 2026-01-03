@@ -16,6 +16,7 @@ import { ApiError } from '../middleware/errorHandler.js';
 import { validateMessageFormat, getMessageMetrics } from '../services/messageFormatter.service.js';
 import { handleConversation, confirmBooking } from '../services/conversationHandler.service.js';
 import { STATES } from '../services/conversationState.service.js';
+import { getOrInitSessionState, updateSessionState, handleRedisUnavailable } from '../services/sessionState.store.js';
 import {
   getSessionLanguage,
   checkLanguageChangeRequest,
@@ -30,8 +31,8 @@ const router = express.Router();
 // In-memory conversation storage (use Redis in production)
 const conversations = new Map();
 
-// In-memory session state storage (use Redis in production)
-const sessionStates = new Map();
+// Session state storage now uses Redis via sessionState.store.js
+// No more in-memory Map for sessionStates
 
 const sanitizeChatBody = (req, res, next) => {
   // remove campos nulos/undefined que quebram validação
@@ -274,12 +275,18 @@ router.post('/', chatRateLimiter, sanitizeChatBody, validateChatMessage, async (
     });
 
     // STEP 3.5: Handle conversation with state machine
-    // Get or initialize session state
-    let sessionState = sessionStates.get(sessionId);
+    // Get or initialize session state from Redis
+    let sessionState = await getOrInitSessionState(sessionId);
+    
+    // Handle conversation with state machine
     const conversationResult = await handleConversation(sessionState, message, sessionId);
     
-    // Update session state
-    sessionStates.set(sessionId, conversationResult.newState);
+    // Update session state in Redis (with automatic TTL refresh)
+    const stateSaved = await updateSessionState(sessionId, conversationResult.newState);
+    
+    if (!stateSaved) {
+      logger.warn('Failed to save session state to Redis, continuing with in-memory state', { sessionId });
+    }
     
     // Check if response is from state machine (scripted) or needs RAG
     let finalMessage;
