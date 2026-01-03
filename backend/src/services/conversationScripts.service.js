@@ -195,24 +195,28 @@ Would you like to book a demo to see it in action?`,
     },
     
     [STATES.BOOK_NAME]: {
-      message: data.name ? `Thanks, ${data.name}. What's your work email?` : 'What\'s your work email?',
+      message: 'What\'s your first name?',
     },
     
     [STATES.BOOK_EMAIL]: {
-      message: 'Perfect. What\'s your phone number (with country code)?',
+      message: 'Thanks! What\'s your work email?',
       invalidMessage: 'That doesn\'t look like a valid email. Please provide your work email.',
     },
     
     [STATES.BOOK_PHONE]: {
-      message: 'What\'s your company name?',
+      message: 'Perfect. What\'s your phone number (with country code)?',
       invalidMessage: 'That doesn\'t look like a valid phone number. Please include country code (e.g., +1234567890).',
     },
     
     [STATES.BOOK_COMPANY]: {
-      message: 'How many employees does your company have?',
+      message: 'Great. What\'s your company name?',
     },
     
     [STATES.BOOK_EMPLOYEES]: {
+      message: 'How many employees does your company have?',
+    },
+    
+    [STATES.BOOK_CHANNEL]: {
       message: `Which channel matters most right now?
 1) WhatsApp
 2) Website Chat
@@ -221,17 +225,13 @@ Would you like to book a demo to see it in action?`,
       options: ['WhatsApp', 'Website Chat', 'Email', 'Instagram/Facebook'],
     },
     
-    [STATES.BOOK_CHANNEL]: {
+    [STATES.BOOK_GOAL]: {
       message: `Thanks. Last question: what's your main goal?
 1) More leads & sales
 2) Faster support
 3) Bookings & scheduling
 4) Operations automation`,
       options: ['More leads & sales', 'Faster support', 'Bookings & scheduling', 'Operations automation'],
-    },
-    
-    [STATES.BOOK_GOAL]: {
-      message: 'Done. Here\'s the next step: [insert booking link] or I can propose the best plan for you.',
     },
     
     [STATES.BOOK_SEND_LINK]: {

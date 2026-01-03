@@ -229,19 +229,59 @@ export function getNextState(currentState, userInput) {
   
   // For menu state, determine next state based on input
   if (currentState === STATES.MENU) {
-    const input = userInput.toLowerCase();
-    if (input.includes('pricing') || input.includes('plan') || input === '1') {
+    // Normalize input: lowercase, remove special chars, trim
+    const input = userInput.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
+    
+    // Option 1: Pricing & Plans
+    if (
+      input.includes('pricing') ||
+      input.includes('plan') ||
+      input.includes('price') ||
+      input.includes('cost') ||
+      input === '1' ||
+      input.startsWith('1 ') ||
+      input.includes('1 pricing')
+    ) {
       return STATES.PRICING_SELECT;
     }
-    if (input.includes('agent') || input === '2') {
+    
+    // Option 2: AI Agents
+    if (
+      input.includes('agent') ||
+      input.includes('ai') ||
+      input === '2' ||
+      input.startsWith('2 ') ||
+      input.includes('2 ai')
+    ) {
       return STATES.AGENTS_SELECT;
     }
-    if (input.includes('support') || input === '3') {
+    
+    // Option 3: Support
+    if (
+      input.includes('support') ||
+      input.includes('help') ||
+      input === '3' ||
+      input.startsWith('3 ')
+    ) {
       return STATES.SUPPORT_ISSUE;
     }
-    if (input.includes('book') || input.includes('demo') || input.includes('call') || input === '4') {
+    
+    // Option 4: Book a Demo
+    if (
+      input.includes('book') ||
+      input.includes('demo') ||
+      input.includes('call') ||
+      input.includes('meeting') ||
+      input.includes('schedule') ||
+      input === '4' ||
+      input.startsWith('4 ')
+    ) {
       return STATES.BOOK_START;
     }
+    
+    // If no match, return null (handler will show error message)
+    logger.warn('No menu option matched', { userInput, normalizedInput: input });
+    return null;
   }
   
   // For pricing detail, check if user wants to book or go back

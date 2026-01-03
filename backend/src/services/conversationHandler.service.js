@@ -39,6 +39,8 @@ export async function handleConversation(sessionState, userMessage, sessionId) {
       sessionId,
       currentState,
       userMessage: userMessage.substring(0, 50),
+      stateHistory: sessionState.history || [],
+      hasData: !!sessionState.data && Object.keys(sessionState.data).length > 0,
     });
     
     // Handle based on current state
@@ -88,12 +90,18 @@ export async function handleConversation(sessionState, userMessage, sessionId) {
         } else if (nextState === STATES.BOOK_START) {
           response = getScript(STATES.BOOK_START);
         } else {
-          // User input didn't match any option, show menu again
+          // User input didn't match any option - ANTI-LOOP: show short error, don't repeat full menu
           response = {
-            message: 'I didn\'t catch that. Please choose from the menu:',
-            ...getWelcomeMessage(),
+            message: 'Please reply with 1, 2, 3, or 4.',
           };
+          // CRITICAL: Stay in MENU state, don't reset to WELCOME
           nextState = STATES.MENU;
+          
+          logger.warn('Invalid menu selection', {
+            sessionId,
+            userMessage: userMessage.substring(0, 50),
+            currentState: STATES.MENU,
+          });
         }
         break;
       
@@ -287,9 +295,12 @@ export async function handleConversation(sessionState, userMessage, sessionId) {
     
     logger.info('Conversation handled', {
       sessionId,
-      oldState: currentState,
-      newState: nextState,
+      prevState: currentState,
+      userMessage: userMessage.substring(0, 50),
+      normalizedIntent: nextState !== currentState ? 'transition' : 'stay',
+      nextState: nextState,
       responseLength: response.message?.length || 0,
+      stateHistory: (sessionState.history || []).concat([currentState]).slice(-5), // Last 5 states
     });
     
     return {
