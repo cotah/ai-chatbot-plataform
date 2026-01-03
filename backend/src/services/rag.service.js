@@ -9,11 +9,14 @@ import config from '../config/index.js';
 import logger from '../utils/logger.js';
 import { logRAGRequest, logRAGError, metricsCollector } from './observability.service.js';
 
-// Initialize clients
-const supabase = createClient(
-  config.supabase.url,
-  config.supabase.serviceKey
-);
+// Initialize clients (only if credentials are available)
+let supabase = null;
+if (config.supabase.url && config.supabase.serviceKey) {
+  supabase = createClient(
+    config.supabase.url,
+    config.supabase.serviceKey
+  );
+}
 
 const openai = new OpenAI({
   apiKey: config.openai.apiKey,
@@ -106,6 +109,12 @@ async function searchChunks(embedding, options = {}) {
     source = null,
     tags = null,
   } = options;
+  
+  // If Supabase is not configured, return empty results
+  if (!supabase) {
+    logger.warn('Supabase not configured, skipping vector search');
+    return [];
+  }
   
   try {
     const { data, error } = await supabase.rpc('match_knowledge_chunks', {

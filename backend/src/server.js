@@ -22,6 +22,9 @@ import videoRoutes from './routes/video.routes.js';
 import healthRoutes from './routes/health.routes.js';
 import metricsRoutes from './routes/metrics.routes.js';
 
+// Tools (for startup logging)
+import { TOOLS } from './services/openai.service.js';
+
 const app = express();
 app.set("trust proxy", 1);
 
@@ -138,6 +141,13 @@ initializeServices().then(() => {
       port: PORT,
       environment: config.server.nodeEnv,
       timestamp: new Date().toISOString(),
+    });
+    
+    // Log available tools on startup
+    const toolNames = TOOLS.map(t => t.function.name);
+    logger.info('Available tools registered', {
+      toolCount: TOOLS.length,
+      tools: toolNames,
     });
   });
 });

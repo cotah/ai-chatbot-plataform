@@ -13,6 +13,7 @@ import { updateSession } from '../middleware/auth.js';
 import { chatRateLimiter } from '../middleware/rateLimiter.js';
 import { validateChatMessage } from '../middleware/validator.js';
 import { ApiError } from '../middleware/errorHandler.js';
+import { validateMessageFormat, getMessageMetrics } from '../services/messageFormatter.service.js';
 import {
   getSessionLanguage,
   checkLanguageChangeRequest,
@@ -399,6 +400,16 @@ router.post('/', chatRateLimiter, sanitizeChatBody, validateChatMessage, async (
       logger.error('Failed to log conversation to CRM', { error: err.message });
     });
 
+    // Validate message format and log warnings
+    const formatWarnings = validateMessageFormat(finalMessage);
+    if (formatWarnings.length > 0) {
+      logger.warn('Message format issues detected', {
+        conversationId,
+        warnings: formatWarnings,
+        metrics: getMessageMetrics(finalMessage),
+      });
+    }
+    
     // Prepare response with language info
     const response = {
       conversationId,
@@ -408,6 +419,7 @@ router.post('/', chatRateLimiter, sanitizeChatBody, validateChatMessage, async (
       language: sessionLanguage,
       languageMode: config.language.mode,
       allowedLanguages: config.language.mode === 'allowed' ? config.language.allowedLanguages : null,
+      formatWarnings: formatWarnings.length > 0 ? formatWarnings : undefined,
     };
 
     // Add language change notification if applicable
