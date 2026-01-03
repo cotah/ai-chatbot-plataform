@@ -20,7 +20,10 @@ export function initRedis() {
   try {
     const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
     
-    redisClient = new Redis(redisUrl, {
+    // Check if URL contains upstash.io (requires TLS)
+    const isUpstash = redisUrl.includes('upstash.io');
+    
+    const redisOptions = {
       retryStrategy: (times) => {
         const delay = Math.min(times * 50, 2000);
         return delay;
@@ -28,7 +31,16 @@ export function initRedis() {
       maxRetriesPerRequest: 3,
       enableReadyCheck: true,
       enableOfflineQueue: true,
-    });
+    };
+    
+    // Add TLS config for Upstash
+    if (isUpstash) {
+      redisOptions.tls = {
+        rejectUnauthorized: false, // Upstash uses self-signed certs
+      };
+    }
+    
+    redisClient = new Redis(redisUrl, redisOptions);
 
     redisClient.on('connect', () => {
       logger.info('Redis client connected');
